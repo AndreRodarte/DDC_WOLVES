@@ -1,0 +1,2534 @@
+---
+title: "_3_Wolves_Analysis"
+author: "André K. Rodarte"
+date: "2026-05-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(showtext)
+library(here)
+library(sysfonts)
+library(scales)
+library(broom)
+library(lubridate)
+library(car)
+library(patchwork)
+library(ggplot2)
+font_add_google("EB Garamond", "EB Garamond")
+showtext_auto()
+```
+
+# Data
+
+```{r}
+# Main datasets
+df_fb <- read_rds(
+  here("..", "_processed_data", "df_fb_GPT.rds"))
+df_fb_election <- read_rds(
+  here("..", "_processed_data", "df_fb_election.rds"))
+nodes_breakdown <- read_csv(
+  here("..", "_processed_data", "nodes_breakdown.csv"))
+
+# Text data
+tokens_text_lemma_monthly <- readr::read_rds(
+  here("..", "_processed_data", "practice_vectors", "tokens_text_lemma_monthly.rds"))
+# Domain data
+account_by_media_domain_counts <- read_rds(
+  here("..", "_processed_data", "account_by_media_domain_counts.rds"))
+```
+
+# Set Up
+
+```{r}
+group_colors <- c(
+  "All other parliamentarians" = "grey60",
+  "Wolves" = "navyblue"
+)
+
+nodes_grouped <- nodes_breakdown %>%
+  mutate(
+    wolf_group = case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    ),
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  ) %>%
+  filter(!is.na(wolf_group))
+
+# ----------------------------
+# Shared theme
+# ----------------------------
+theme_wolves <- function() {
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
+    theme(
+      text = element_text(family = "EB Garamond", size = 30),
+      plot.title = element_text(face = "bold", size = 40),
+      axis.title = element_text(size = 32),
+      axis.text = element_text(size = 30),
+      legend.title = element_text(size = 30),
+      legend.text = element_text(size = 30),
+      strip.text = element_text(size = 32, face = "bold")
+    )
+}
+
+# ----------------------------
+# ANOVA
+# ----------------------------
+eta_squared_from_aov <- function(model) {
+  aov_table <- broom::tidy(model)
+  
+  ss_effect <- aov_table %>%
+    filter(term != "Residuals") %>%
+    pull(sumsq)
+  
+  ss_total <- sum(aov_table$sumsq, na.rm = TRUE)
+  
+  tibble(
+    term = aov_table %>%
+      filter(term != "Residuals") %>%
+      pull(term),
+    eta_squared = ss_effect / ss_total
+  )
+}
+
+
+output_path <- here::here("_output")
+```
+
+## Q1+Q2
+
+```{r}
+# ----------------------------
+# Account-level dataset
+# ----------------------------
+pec135_account_summary <- df_fb_election %>%
+  filter(!is.na(PEC135)) %>%
+  group_by(author) %>%
+  summarise(
+    PEC135 = first(na.omit(PEC135)),
+    party = first(na.omit(party)),
+    account_total_posts = n(),
+    account_Q1_posts = sum(Q1 == 1, na.rm = TRUE),
+    account_Q2_posts = sum(Q2 == 1, na.rm = TRUE),
+    account_mean_engagement = mean(engagement, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    pec135_group = case_when(
+      PEC135 == 1 ~ "In favor",
+      PEC135 == 0 ~ "Against",
+      TRUE ~ NA_character_
+    ),
+    pec135_group = factor(
+      pec135_group,
+      levels = c("Against", "In favor")
+    )
+  ) %>%
+  filter(!is.na(pec135_group))
+
+# ----------------------------
+# Summary table
+# ----------------------------
+pec135_summary_table <- pec135_account_summary %>%
+  group_by(pec135_group) %>%
+  summarise(
+    n_politicians = n_distinct(author),
+    n_parties = n_distinct(party, na.rm = TRUE),
+    
+    total_Q1_posts = sum(account_Q1_posts, na.rm = TRUE),
+    mean_Q1_posts_per_politician = mean(account_Q1_posts, na.rm = TRUE),
+    
+    total_Q2_posts = sum(account_Q2_posts, na.rm = TRUE),
+    mean_Q2_posts_per_politician = mean(account_Q2_posts, na.rm = TRUE),
+    
+    total_posts = sum(account_total_posts, na.rm = TRUE),
+    mean_engagement = mean(account_mean_engagement, na.rm = TRUE),
+    
+    .groups = "drop"
+  )
+
+# pec135_summary_table <- pec135_summary_table %>%
+#   mutate(
+#     mean_Q1_posts_per_account = round(mean_Q1_posts_per_account, 2),
+#     mean_Q2_posts_per_account = round(mean_Q2_posts_per_account, 2),
+#     mean_engagement = round(mean_engagement, 2)
+#   )
+
+pec135_summary_table
+```
+
+```{r}
+pec135_q1_plot_df <- pec135_summary_table %>%
+  select(pec135_group,mean_Q1_posts_per_politician)
+
+p_pec135_q1_posts <- ggplot(
+  pec135_q1_plot_df,
+  aes(x = pec135_group, y = mean_Q1_posts_per_politician)) +
+  geom_col(width = 0.6, fill = "grey60") +
+  scale_y_continuous(labels = comma_format(), limits = c(0, NA)) +
+  labs(
+    title = "Average Number of Posts about the Electoral System",
+    x = NULL,
+    y = "") +
+  theme_wolves() +
+  theme(legend.position = "none",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black", linewidth = 0.5),
+    axis.ticks = element_line(color = "black", linewidth = 0.5))
+
+p_pec135_q1_posts
+```
+
+```{r}
+pec135_plot_df <- pec135_summary_table %>%
+  dplyr::select(pec135_group, mean_Q1_posts_per_politician,
+         mean_Q2_posts_per_politician) %>%
+  pivot_longer(
+    cols = c(mean_Q1_posts_per_politician, mean_Q2_posts_per_politician),
+    names_to = "post_type",
+    values_to = "mean_posts") %>%
+  mutate(
+    post_type = recode(
+      post_type,
+      mean_Q1_posts_per_politician = "Q1 posts",
+      mean_Q2_posts_per_politician = "Q2 posts"),
+    post_type = factor(post_type,
+      levels = c("Q1 posts", "Q2 posts"))
+  )
+
+p_pec135_q_posts <- ggplot(
+  pec135_plot_df,
+  aes(x = pec135_group, y = mean_posts, fill = post_type)) +
+  geom_col(position = position_dodge(width = 0.8),
+    width = 0.7) +
+  scale_fill_manual(
+    values = c(
+      "Q1 posts" = "grey60",
+      "Q2 posts" = "black")) +
+  scale_y_continuous(
+    labels = comma_format(),
+    limits = c(0, NA)) +
+  labs(
+    title = "Average Number of Q1 and Q2 Posts",
+    x = NULL,
+    y = "Average number of posts per politician",
+    fill = NULL) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black", linewidth = 0.5),
+    axis.ticks = element_line(color = "black", linewidth = 0.5))
+
+p_pec135_q_posts
+```
+
+## Temporal analysis
+
+```{r}
+df_grouped <- df_fb_election %>%
+  left_join(nodes_grouped %>%
+      select(author, wolf_group),
+    by = "author") %>%
+  filter(
+    !is.na(wolf_group),
+    !is.na(timestamp)) %>%
+  mutate(
+    month = floor_date(timestamp, unit = "month"),
+    Q1 = if_else(is.na(Q1), 0L, Q1),
+    Q2 = if_else(is.na(Q2), 0L, Q2))
+
+# ----------------------------
+# Monthly evolution: Q1 counts
+# ----------------------------
+q1_monthly <- df_grouped %>%
+  group_by(month, wolf_group) %>%
+  summarise(
+    total_posts = n(),
+    q1_posts = sum(Q1 == 1, na.rm = TRUE),
+    .groups = "drop")
+
+p_q1_evolution <- ggplot(q1_monthly,
+  aes(
+    x = month,
+    y = q1_posts,
+    color = wolf_group,
+    group = wolf_group)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = group_colors) +
+  scale_y_continuous(
+    labels = comma_format(),
+    limits = c(0, NA)) +
+  scale_x_date(
+    date_breaks = "3 months",
+    date_labels = "%b %Y") +
+  labs(
+    title = "Evolution over time of posts discussing electoral integrity",
+    x = NULL,
+    y = " ",
+    color = NULL) +
+  theme_wolves() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black", linewidth = 0.5),
+    axis.ticks = element_line(color = "black", linewidth = 0.5))
+
+p_q1_evolution
+```
+
+```{r}
+# ----------------------------
+# Monthly evolution: Q2 counts
+# ----------------------------
+q2_monthly <- df_grouped %>%
+  group_by(month, wolf_group) %>%
+  summarise(
+    total_posts = n(),
+    q2_posts = sum(Q2 == 1, na.rm = TRUE),
+    .groups = "drop")
+
+p_q2_evolution <- ggplot(q2_monthly,
+  aes(
+    x = month,
+    y = q2_posts,
+    color = wolf_group,
+    group = wolf_group)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = group_colors) +
+  scale_y_continuous(
+    labels = comma_format(),
+    limits = c(0, NA)) +
+  scale_x_date(
+    date_breaks = "3 months",
+    date_labels = "%b %Y") +
+  labs(
+    title = "Evolution over time of posts with election integrity propaganda",
+    x = NULL,
+    y = "Monthly number of 'Q2' Posts",
+    color = NULL
+  ) +
+  theme_wolves() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom")
+
+p_q2_evolution
+```
+
+```{r}
+# ----------------------------
+# Monthly evolution: Q1 and Q2 counts among Wolves only
+# ----------------------------
+q_wolves_monthly <- df_grouped %>%
+  filter(wolf_group == "Wolves") %>%
+  group_by(month) %>%
+  summarise(
+    total_posts = n(),
+    Q1 = sum(Q1 == 1, na.rm = TRUE),
+    Q2 = sum(Q2 == 1, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = c(Q1, Q2),
+    names_to = "question",
+    values_to = "n_posts"
+  ) %>%
+  mutate(
+    question = factor(
+      question,
+      levels = c("Q1", "Q2"),
+      labels = c("Q1 posts", "Q2 posts")))
+
+p_q_wolves_only <- ggplot(
+  q_wolves_monthly,
+  aes(
+    x = month,
+    y = n_posts,
+    color = question,
+    group = question)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c(
+      "Q1 posts" = "lightblue",
+      "Q2 posts" = "darkblue")) +
+  scale_y_continuous(
+    labels = comma_format(),
+    limits = c(0, NA)) +
+  scale_x_date(
+    date_breaks = "3 months",
+    date_labels = "%b %Y") +
+  labs(
+    title = "Evolution of Q1 and Q2 Posts Among Wolves",
+    x = NULL,
+    y = "Monthly number of posts",
+    color = NULL) +
+  theme_wolves() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom")
+
+p_q_wolves_only
+```
+
+# Descriptive Analysis
+
+## Engagement
+
+```{r}
+engagement_summary <- nodes_grouped %>%
+  group_by(wolf_group) %>%
+  summarise(
+    group_mean_engagement = mean(mean_engagement, na.rm = TRUE),
+    group_sd_engagement   = sd(mean_engagement, na.rm = TRUE),
+    n_accounts            = n(),
+    .groups = "drop")
+
+p_mean_engagement <- ggplot(
+  engagement_summary,
+  aes(x = wolf_group, y = group_mean_engagement, fill = wolf_group)) +
+  geom_col(width = 0.65) +
+  geom_errorbar(aes(
+    ymin = pmax(group_mean_engagement - group_sd_engagement, 0), 
+    ymax = group_mean_engagement + group_sd_engagement), 
+                width = 0.1, linewidth = 0.7) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Mean Engagement by Group",
+    x = NULL, 
+    y = "") +
+  theme_wolves() +
+  theme(legend.position = "none")
+
+p_mean_engagement
+```
+
+```{r}
+anova_engagement <- aov(
+  mean_engagement ~ wolf_group,
+  data = nodes_grouped
+)
+anova_engagement_tidy <- broom::tidy(anova_engagement)
+
+#Results:
+summary(anova_engagement)
+anova_engagement_tidy
+eta_squared_from_aov(anova_engagement)
+```
+
+## Followership
+
+```{r}
+followers_by_author <- df_fb %>%
+  group_by(author) %>%
+  summarise(mean_followers = mean(page_followers, na.rm = TRUE),
+    .groups = "drop")
+
+followers_summary <- nodes_grouped %>%
+  left_join(followers_by_author, by = "author") %>%
+  group_by(wolf_group) %>%
+  summarise(group_mean_followers = mean(mean_followers, na.rm = TRUE),
+    group_sd_followers   = sd(mean_followers, na.rm = TRUE),
+    n_accounts           = n(),
+    .groups = "drop")
+
+p_mean_followers <- ggplot(
+  followers_summary,
+  aes(x = wolf_group, y = group_mean_followers, fill = wolf_group)) +
+  geom_col(width = 0.65) +
+  geom_errorbar(aes(
+      ymin = pmax(group_mean_followers - group_sd_followers, 0),
+      ymax = group_mean_followers + group_sd_followers),
+    width = 0.1,
+    linewidth = 0.9) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Mean Followership by Group",
+    x = NULL,
+    y = "Mean followers per account") +
+  theme_wolves() +
+  theme(legend.position = "none")
+
+p_mean_followers
+```
+
+```{r}
+followers_anova_df <- nodes_grouped %>%
+  left_join(followers_by_author, by = "author") %>%
+  filter(!is.na(mean_followers))
+
+anova_followers <- aov(
+  mean_followers ~ wolf_group,
+  data = followers_anova_df)
+
+anova_followers_tidy <- broom::tidy(anova_followers)
+
+# Results:
+summary(anova_followers)
+anova_followers_tidy
+eta_squared_from_aov(anova_followers)
+```
+
+## Post activity
+
+```{r}
+posts_summary <- nodes_grouped %>%
+  group_by(wolf_group) %>%
+  summarise(
+    group_mean_posts = mean(total_posts, na.rm = TRUE),
+    group_sd_posts   = sd(total_posts, na.rm = TRUE),
+    n_accounts       = n(),
+    .groups = "drop"
+  )
+
+p_mean_posts <- ggplot(
+  posts_summary,
+  aes(x = wolf_group, y = group_mean_posts, fill = wolf_group)
+) +
+  geom_col(width = 0.65) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(group_mean_posts - group_sd_posts, 0),
+      ymax = group_mean_posts + group_sd_posts
+    ),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Mean Number of Posts by Group",
+    x = NULL,
+    y = "Mean number of posts per account"
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "none"
+  )
+
+p_mean_posts
+```
+
+```{r}
+anova_posts <- aov(
+  total_posts ~ wolf_group,
+  data = nodes_grouped
+)
+
+anova_posts_tidy <- broom::tidy(anova_posts)
+
+# Results:
+summary(anova_posts)
+anova_posts_tidy
+eta_squared_from_aov(anova_posts)
+```
+
+## Format
+
+```{r}
+post_format_author <- df_fb %>%
+  filter(!is.na(post_format)) %>%
+  count(author, post_format, name = "n_format") %>%
+  group_by(author) %>%
+  mutate(
+    total_author_posts = sum(n_format, na.rm = TRUE),
+    prop_format = n_format / total_author_posts
+  ) %>%
+  ungroup()
+
+post_format_summary <- post_format_author %>%
+  left_join(
+    nodes_grouped %>%
+      select(author, wolf_group),
+    by = "author"
+  ) %>%
+  filter(!is.na(wolf_group)) %>%
+  group_by(wolf_group, post_format) %>%
+  summarise(
+    group_mean_prop_format = mean(prop_format, na.rm = TRUE),
+    group_sd_prop_format   = sd(prop_format, na.rm = TRUE),
+    n_accounts             = n_distinct(author),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    group_mean_prop_format = 100 * group_mean_prop_format,
+    group_sd_prop_format   = 100 * group_sd_prop_format
+  )
+
+p_post_format <- ggplot(
+  post_format_summary,
+  aes(x = post_format, y = group_mean_prop_format, fill = wolf_group)) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7) +
+  geom_errorbar(aes(
+      ymin = pmax(group_mean_prop_format - group_sd_prop_format, 0),
+      ymax = group_mean_prop_format + group_sd_prop_format),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(
+    title = "Post Formats by Group",
+    x = NULL,
+    y = "Mean share of posts",
+    fill = NULL) +
+  theme_wolves() +
+  theme(legend.position = "bottom")
+
+p_post_format
+```
+
+### ANOVA
+
+```{r}
+anova_main_results <- bind_rows(
+  anova_engagement_tidy %>%
+    filter(term == "wolf_group") %>%
+    mutate(
+      test = "Mean engagement",
+      eta_squared = eta_squared_from_aov(anova_engagement)$eta_squared
+    ),
+  
+  anova_followers_tidy %>%
+    filter(term == "wolf_group") %>%
+    mutate(
+      test = "Mean followership",
+      eta_squared = eta_squared_from_aov(anova_followers)$eta_squared
+    ),
+  
+  anova_posts_tidy %>%
+    filter(term == "wolf_group") %>%
+    mutate(
+      test = "Number of posts",
+      eta_squared = eta_squared_from_aov(anova_posts)$eta_squared
+    )
+) %>%
+  select(test, term, df, statistic, p.value, eta_squared) %>%
+  mutate(
+    statistic = round(statistic, 3),
+    p.value = round(p.value, 4),
+    eta_squared = round(eta_squared, 3)
+  )
+
+# Results:
+anova_main_results
+```
+
+## Summary
+
+One-way ANOVAs show that wolves differed significantly from all other parliamentarians across all three account-level indicators. Wolves had higher mean engagement, F(1, 483) = 46.55, p \< .001, η² = .088, higher mean followership, F(1, 482) = 14.57, p \< .001, η² = .030, and produced more posts, F(1, 483) = 62.47, p \< .001, η² = .115. The largest difference concerns posting volume, followed by engagement and then followership, suggesting that wolves were not only more visible but also more active on Facebook.
+
+# Domain Analysis
+
+```{r}
+mainstream_domains <- c("aosfatos", "band", "bbc", "bbccouk", "bbcin", "buzzfeed", "clarin", "cnn", "cnnbrasil", "correiobraziliense", "dailymailcouk", "eldiarioes", "elpais", "elpaiscomuy", "estadao", "exame", "extraglobo", "folha", "folha1", "g1globo", "gazetadopovo", "globo", "globo", "huffpost", "huffpostbrasil", "independentcouk", "infomoney", "istoedinheiro", "istoe", "lemondefr", "metropolenoticias", "nexojornal", "noticiasuol", "nytimes", "ogloboglobo", "poder360", "r7", "reuters", "sbt", "sbtinterior", "sbtnews", "telegraphcouk", "terra", "theguardian", "uol", "valor", "washingtonpost", "wsj", "yahoo")
+
+hyper_partisan_domains <- c("agoranoticiasbrasil", "aliadosbrasil", "brasilsemmedo", "capixabaempregos", "cartacapital", "esquerdadiario", "esquerdaonline", "financasbrasil", "intercept", "jacobin", "jornaldacidadeonline", "jovempan", "mbl", "mblnews", "midianinja", "mises", "noticiasdebrasilia", "novaiguacu24h", "oantagonismo", "oantagonista", "opiniaoes", "pensandodireita", "plenonews", "renovamidia", "revistaonline", "revistaoeste", "romanews", "tercalivre", "terrabrasilnoticias", "theintercept", "veja", "vejario", "vejasp")
+
+party_domains <- c("cstpsol", "democratas", "mulheresrepublicanas10", "novo", "novonacamara", "pcdob", "pcdobba", "pcdobnacamara", "pdt", "pdtnacamara", "pl22", "podemos", "pps", "prb10", "prb10rj", "prb10sp", "prbmg10", "prbmulher10", "prbnacamara", "progressistas", "pros", "pros90", "prosnacamara", "psb40", "psb40bahia", "psbnacamara", "psc", "psd", "psdmg", "psdb", "psdbnacamara", "psdcamara", "pslsp", "psol", "psol50", "psol50sp", "psolbemviver", "psolcamarasp", "psolcarioca", "psolnacamara", "psolniteroi", "psolsaude", "psolsemente", "pt", "ptalagoas", "ptassembleiasp", "ptbahia", "ptb", "ptbnacamara", "ptcarioca", "ptceara", "ptmt", "ptnaalep", "ptnacamara", "ptnosenado", "ptpaulista", "ptpr", "ptsaopaulo", "ptsc", "ptsul", "pv", "republicanos10", "republicanos1010", "republicanos10mg", "republicanos10nacamara", "republicanos10riopreto", "republicanos10sp", "solidariedaderj")
+
+radio_domains <- c("94fm", "anchorfm", "bandnewsfm", "bandnewsfmcuritiba", "bandnewsfmrio", "cbncaruaru", "cbncuritiba", "cbnlondrina", "cbnmaringa", "cbnrecife", "cbnvitoria", "metropolitanoonline", "radiobandeirantes", "radiocabiuna", "radiocacula", "radiocaxias", "radioclubfmnet", "radiocomunitariaclubefm", "radioconvencao", "radiocorredor", "radiocostaverdefm", "radiocruzdemalta", "radiofmz", "radiofolhabv", "radiogeracao", "radioglobocampogrande", "radioguaratuba", "radiohora", "radioiara", "radiointegracaoam1180", "radioipiranga", "radiometropole", "radionereuramos", "radionovaprogresso", "radiopanoramicafm", "radiopeaobrasil", "radioprata", "radiosanfm", "radiosantacruz", "radiosaoluiz", "radiosaopedrense", "radioschroederfm", "radiosoledade", "radiotaquara", "radioterena", "radiotucunare", "radioturmalina", "radiouniversitariafm", "radioveracruz", "radiowebcp")
+
+clean_domain_key <- function(x) {
+  x %>%
+    stringi::stri_trans_general(id = "Latin-ASCII") %>%
+    stringr::str_to_lower() %>%
+    stringr::str_replace_all("^https?://", "") %>%
+    stringr::str_replace_all("^www\\.", "") %>%
+    stringr::str_replace_all("[^a-z0-9]", "") %>%
+    stringr::str_trim()
+}
+
+classify_domain <- function(domain) {
+  domain_key <- clean_domain_key(domain)
+  dplyr::case_when(
+    domain_key %in% mainstream_domains ~ "Mainstream",
+    domain_key %in% hyper_partisan_domains ~ "Hyper-partisan",
+    domain_key %in% party_domains ~ "Party domains",
+    domain_key %in% radio_domains ~ "Radio",
+    TRUE ~ "Others"
+  )
+}
+```
+
+```{r}
+# Domain usage summaries by account and wolf status
+# Convert account_by_media_domain_counts into long format
+account_domain_long_for_usage <- account_by_media_domain_counts %>%
+  as.data.frame(check.names = FALSE) %>%
+  tidyr::pivot_longer(
+    cols = -author,
+    names_to = "domain",
+    values_to = "n_domain_references"
+  ) %>%
+  dplyr::filter(n_domain_references > 0) %>%
+  dplyr::mutate(
+    domain_category = classify_domain(domain)
+  )
+
+# Account-level post counts from df_fb
+account_post_counts <- df_fb %>%
+  dplyr::count(author, name = "n_posts")
+
+
+# Account-level domain usage table
+domain_usage_author <- nodes_breakdown %>%
+  dplyr::select(author, is_wolf) %>%
+  dplyr::left_join(account_post_counts, by = "author") %>%
+  dplyr::left_join(
+    account_domain_long_for_usage %>%
+      dplyr::group_by(author) %>%
+      dplyr::summarise(
+        n_domains_references = sum(n_domain_references, na.rm = TRUE),
+        n_unique_domain_references = dplyr::n_distinct(domain),
+        mainstream_domains = sum(
+          n_domain_references[domain_category == "Mainstream"],
+          na.rm = TRUE
+        ),
+        hyper_partisan_domains = sum(
+          n_domain_references[domain_category == "Hyper-partisan"],
+          na.rm = TRUE
+        ),
+        party_domains = sum(
+          n_domain_references[domain_category == "Party domains"],
+          na.rm = TRUE
+        ),
+        .groups = "drop"
+      ),
+    by = "author"
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        n_posts,
+        n_domains_references,
+        n_unique_domain_references,
+        mainstream_domains,
+        hyper_partisan_domains,
+        party_domains
+      ),
+      ~ dplyr::coalesce(.x, 0)
+    ),
+    ratio_domains_references = 100 * n_domains_references / n_posts,
+    ratio_mainstream = 100 * mainstream_domains / n_posts,
+    ratio_hyper_partisan = 100 * hyper_partisan_domains / n_posts,
+    ratio_party_domains = 100 * party_domains / n_posts
+  )
+
+# Inspect
+glimpse(domain_usage_author)
+```
+
+#### Group Comparison
+
+```{r}
+domain_usage_group <- domain_usage_author %>%
+  dplyr::mutate(
+    wolf_group = dplyr::case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    n_members = dplyr::n(),
+    # Posts
+    total_posts = sum(n_posts, na.rm = TRUE),
+    mean_posts = mean(n_posts, na.rm = TRUE),
+    sd_posts = sd(n_posts, na.rm = TRUE),
+    # Domain references
+    total_domain_references = sum(n_domains_references, na.rm = TRUE),
+    mean_domain_references = mean(n_domains_references, na.rm = TRUE),
+    sd_domain_references = sd(n_domains_references, na.rm = TRUE),
+    # Unique domains
+    total_unique_domain_references = sum(n_unique_domain_references, na.rm = TRUE),
+    # Domain references per 100 posts
+    ratio_domain_references = 100 * total_domain_references / total_posts,
+    
+    # Account-level average of the ratio
+    mean_ratio_domain_references = mean(
+      ratio_domains_references, na.rm = TRUE),
+    sd_ratio_domain_references = sd(ratio_domains_references, na.rm = TRUE),
+    .groups = "drop") %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = "measure",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = wolf_group,
+    values_from = value
+  )
+
+# Format
+domain_usage_group_formatted <- domain_usage_group %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(`All other parliamentarians`, Wolves),
+      ~ dplyr::case_when(
+        # Count variables: no decimals
+        measure %in% c(
+          "n_members",
+          "total_posts",
+          "total_domain_references",
+          "total_unique_domain_references"
+        ) ~ round(.x, 0),
+
+        # Means, SDs, and ratios: two decimals
+        TRUE ~ round(.x, 2)
+      )
+    )
+  )
+
+# Inspect
+domain_usage_group_formatted
+```
+
+#### Category Comparison
+
+```{r}
+# Create account-level post counts with no linked domain
+posts_no_domains_author <- df_fb %>%
+  dplyr::mutate(
+    has_linked_domain = !is.na(domain) & domain != ""
+  ) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    n_posts_no_domains = sum(!has_linked_domain, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Group-level comparison
+domain_category_counts <- domain_usage_author %>%
+  dplyr::left_join(
+    posts_no_domains_author,
+    by = "author"
+  ) %>%
+  dplyr::mutate(
+    n_posts_no_domains = dplyr::coalesce(n_posts_no_domains, 0),
+    
+    ratio_posts_no_domains = 100 * n_posts_no_domains / n_posts,
+    
+    wolf_group = dplyr::case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    # Group size and activity
+    n_members = dplyr::n(),
+    total_posts = sum(n_posts, na.rm = TRUE),
+    mean_posts = mean(n_posts, na.rm = TRUE),
+    sd_posts = sd(n_posts, na.rm = TRUE),
+    
+    # Hyper-partisan domains
+    mean_hyperpartisan_references = mean(hyper_partisan_domains, na.rm = TRUE),
+    ratio_hyperpartisan_references =
+      100 * sum(hyper_partisan_domains, na.rm = TRUE) / sum(n_posts, na.rm = TRUE),
+    mean_ratio_hyperpartisan_references =
+      mean(ratio_hyper_partisan, na.rm = TRUE),
+    
+    # Mainstream domains
+    mean_mainstream_references = mean(mainstream_domains, na.rm = TRUE),
+    ratio_mainstream_references =
+      100 * sum(mainstream_domains, na.rm = TRUE) / sum(n_posts, na.rm = TRUE),
+    mean_ratio_mainstream_references =
+      mean(ratio_mainstream, na.rm = TRUE),
+    
+    # Party domains
+    mean_partydomains_references = mean(party_domains, na.rm = TRUE),
+    ratio_partydomains_references =
+      100 * sum(party_domains, na.rm = TRUE) / sum(n_posts, na.rm = TRUE),
+    mean_ratio_partydomains_references =
+      mean(ratio_party_domains, na.rm = TRUE),
+    
+    # Posts with no linked domain
+    mean_posts_no_domains = mean(n_posts_no_domains, na.rm = TRUE),
+    ratio_posts_no_domains =
+      100 * sum(n_posts_no_domains, na.rm = TRUE) / sum(n_posts, na.rm = TRUE),
+    mean_ratio_posts_no_domains =
+      mean(ratio_posts_no_domains, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = "measure",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = wolf_group,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(`All other parliamentarians`, Wolves),
+      ~ dplyr::case_when(
+        measure %in% c(
+          "n_members",
+          "total_posts"
+        ) ~ round(.x, 0),
+        TRUE ~ round(.x, 2)
+      )
+    )
+  )
+
+# Inspect
+domain_category_counts
+```
+
+##### ANOVA
+
+```{r}
+# ANOVAs: DOMAIN REFERENCES BY GROUP
+eta_squared_from_aov <- function(model) {
+  effectsize::eta_squared(model, partial = FALSE)
+}
+
+# Prepare data
+domain_usage_anova <- domain_usage_author %>%
+  mutate(
+    wolf_group = case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    ),
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  ) %>%
+  filter(!is.na(wolf_group))
+
+
+############################################
+#### A. Mean domain references by group  ####
+############################################
+# Raw count of domain references
+anova_domain_references <- aov(
+  n_domains_references ~ wolf_group,
+  data = domain_usage_anova
+)
+
+anova_domain_references_tidy <- broom::tidy(anova_domain_references)
+anova_domain_references_eta <- eta_squared_from_aov(anova_domain_references)
+
+# Results
+summary(anova_domain_references)
+anova_domain_references_tidy
+anova_domain_references_eta
+
+
+# Optional: use the rate per 100 posts instead of raw counts
+# anova_ratio_domain_references <- aov(
+#   ratio_domains_references ~ wolf_group,
+#   data = domain_usage_anova
+# )
+# 
+# anova_ratio_domain_references_tidy <- broom::tidy(anova_ratio_domain_references)
+# anova_ratio_domain_references_eta <- eta_squared_from_aov(anova_ratio_domain_references)
+# 
+# # Results
+# summary(anova_ratio_domain_references)
+# anova_ratio_domain_references_tidy
+# anova_ratio_domain_references_eta
+```
+
+```{r}
+# Mean domain references by category and group 
+domain_category_anova_long <- domain_usage_anova %>%
+  select(
+    author,
+    wolf_group,
+    mainstream_domains,
+    hyper_partisan_domains,
+    ratio_mainstream,
+    ratio_hyper_partisan
+  ) %>%
+  pivot_longer(
+    cols = c(mainstream_domains, hyper_partisan_domains),
+    names_to = "domain_category",
+    values_to = "n_category_references"
+  ) %>%
+  mutate(
+    domain_category = recode(
+      domain_category,
+      mainstream_domains = "Mainstream media",
+      hyper_partisan_domains = "Hyper-partisan media"
+    ),
+    domain_category = factor(
+      domain_category,
+      levels = c("Mainstream media", "Hyper-partisan media")))
+
+# Two-way ANOVA:
+# - Does usage differ by group?
+# - Does usage differ by category?
+# - Does the category difference vary by group?
+anova_category_group <- aov(
+  n_category_references ~ wolf_group * domain_category,
+  data = domain_category_anova_long)
+
+anova_category_group_tidy <- broom::tidy(anova_category_group)
+anova_category_group_eta <- eta_squared_from_aov(anova_category_group)
+
+# Results
+summary(anova_category_group)
+anova_category_group_tidy
+anova_category_group_eta
+```
+
+##### Plots
+
+```{r}
+domain_references_summary <- domain_usage_author %>%
+  dplyr::mutate(
+    wolf_group = dplyr::case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    ),
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    group_mean_domain_references = mean(n_domains_references, na.rm = TRUE),
+    group_sd_domain_references = sd(n_domains_references, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+p_mean_domain_references <- ggplot(
+  domain_references_summary,
+  aes(
+    x = wolf_group,
+    y = group_mean_domain_references,
+    fill = wolf_group
+  )
+) +
+  geom_col(width = 0.65) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(group_mean_domain_references - group_sd_domain_references, 0),
+      ymax = group_mean_domain_references + group_sd_domain_references
+    ),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Mean Number of Domain References by Group",
+    x = NULL,
+    y = ""
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "none"
+  )
+
+p_mean_domain_references
+```
+
+```{r}
+#### Plot: Mean domain references by category and group
+domain_category_summary <- domain_usage_author %>%
+  dplyr::mutate(
+    wolf_group = dplyr::case_when(
+      is_wolf == 1 ~ "Wolves",
+      is_wolf == 0 ~ "All other parliamentarians",
+      TRUE ~ NA_character_
+    ),
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::select(
+    author,
+    wolf_group,
+    mainstream_domains,
+    hyper_partisan_domains,
+  ) %>%
+  tidyr::pivot_longer(
+    cols = c(
+      mainstream_domains,
+      hyper_partisan_domains,
+    ),
+    names_to = "domain_category",
+    values_to = "n_references"
+  ) %>%
+  dplyr::mutate(
+    domain_category = dplyr::recode(
+      domain_category,
+      mainstream_domains = "Mainstream media",
+      hyper_partisan_domains = "Hyper-partisan media"
+    ),
+    domain_category = factor(
+      domain_category,
+      levels = c(
+        "Mainstream media",
+        "Hyper-partisan media"))) %>%
+  dplyr::group_by(wolf_group, domain_category) %>%
+  dplyr::summarise(
+    group_mean_references = mean(n_references, na.rm = TRUE),
+    group_sd_references = sd(n_references, na.rm = TRUE),
+    .groups = "drop")
+
+p_mean_domain_categories <- ggplot(
+  domain_category_summary,
+  aes(
+    x = domain_category,
+    y = group_mean_references,
+    fill = wolf_group)) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.65
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(group_mean_references - group_sd_references, 0),
+      ymax = group_mean_references + group_sd_references
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Mean Number of Domain References by Category",
+    x = NULL,
+    y = "",
+    fill = NULL
+  ) +
+  theme_wolves()
+
+p_mean_domain_categories
+```
+
+```{r}
+#### Save plots as PNG
+dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
+
+ggplot2::ggsave(
+  filename = file.path(output_path, "mean_domain_references_by_group.png"),
+  plot = p_mean_domain_references,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggplot2::ggsave(
+  filename = file.path(output_path, "mean_domain_references_by_category.png"),
+  plot = p_mean_domain_categories,
+  width = 8,
+  height = 5,
+  dpi = 300
+)
+```
+
+# Textual Analysis
+
+## Sparsity & Entropy Analysis
+
+**Sparsity:** Count how many unique words a politician uses by looking at raw counts matrix (`X_text_counts_trimmed`) and calculating the number of non-zero columns per row.
+
+**The entropy analysis** allow us to measure the consistency in these politicians' communications. It requires a measurement of randomness in a corpus, which can be provided by "Shannon Entropy". We will use these entropy estimates to run a ANOVAs.
+
+*"Shannon entropy is defined as the average rate at which information is produced by a stochastic source of data, where higher entropy indicates greater information content from new values" (*[Reference 1](https://www.sciencedirect.com/topics/engineering/shannon-entropy)*).*
+
+```{r}
+# Set up: identify the top 3 most numerous Louvain communities
+top_3_communities <- nodes_breakdown %>%
+  dplyr::count(louvain_community, sort = TRUE) %>%
+  dplyr::slice_head(n = 3) %>%
+  dplyr::pull(louvain_community)
+
+# Convert grouping variables to factors
+metadata_clean <- nodes_breakdown %>%
+  dplyr::mutate(
+    louvain_community = factor(louvain_community),
+    is_wolf = factor(is_wolf))
+
+# Overall Vocabulary Size (Sparsity) per Politician
+df_vocab <- tokens_text_lemma_monthly %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    vocab_size = dplyr::n_distinct(lemma),
+    .groups = "drop"
+  )
+
+# Monthly Shannon Entropy per Politician
+df_monthly_entropy <- tokens_text_lemma_monthly %>%
+  dplyr::group_by(author, month) %>%
+  dplyr::mutate(p = n / sum(n)) %>% 
+  dplyr::summarise(
+    # Shannon Entropy formula applied to the long-format probabilities
+    month_entropy = -sum(p * log(p), na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Average Monthly Entropy per Politician
+df_entropy_avg <- df_monthly_entropy %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    avg_text_entropy = mean(month_entropy, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Merge Metrics with Metadata
+df_politicians_analysis <- metadata_clean %>%
+  dplyr::inner_join(df_vocab, by = "author") %>%
+  dplyr::inner_join(df_entropy_avg, by = "author")
+
+df_clusters <- df_politicians_analysis %>%
+  dplyr::filter(louvain_community %in% top_3_communities) %>%
+  dplyr::mutate(louvain_community = droplevels(louvain_community))
+```
+
+**Cluster Analysis**
+
+```{r}
+# Top 3 Communities: 245 vs 99 vs 110)
+
+# Check Homoscedasticity (Levene's Test)
+message("\n>>> Homoscedasticity Diagnostics (Levene's Test) <<<")
+print(car::leveneTest(vocab_size ~ louvain_community, data = df_clusters))
+print(car::leveneTest(avg_text_entropy ~ louvain_community, data = df_clusters))
+
+# Run Welch's One-Way ANOVA 
+message("\n>>> Welch's ANOVA for Vocabulary Size <<<")
+vocab_cluster_welch <- oneway.test(vocab_size ~ louvain_community, data = df_clusters, var.equal = FALSE)
+print(vocab_cluster_welch)
+
+message("\n>>> Welch's ANOVA for Entropy <<<")
+entropy_cluster_welch <- oneway.test(avg_text_entropy ~ louvain_community, data = df_clusters, var.equal = FALSE)
+print(entropy_cluster_welch)
+
+# Pairwise Post-Hoc Comparisons using Welch's t-test + Bonferroni adjustment
+message("\n>>> Non-Homoscedastic Post-Hoc (Pairwise Welch t-tests) <<<")
+pairwise_entropy <- pairwise.t.test(
+  df_clusters$avg_text_entropy, 
+  df_clusters$louvain_community, 
+  p.adjust.method = "bonferroni", 
+  pool.sd = FALSE # tells R to calculate separate variances for each pair
+)
+print(pairwise_entropy)
+
+# Print
+df_clusters %>%
+  dplyr::group_by(louvain_community) %>%
+  dplyr::summarise(
+    n_politicians = dplyr::n(),
+    mean_vocab    = mean(vocab_size, na.rm = TRUE),
+    mean_entropy  = mean(avg_text_entropy, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  print()
+```
+
+**Summary**: To assess the robustness of the comparative framework across the three primary network clusters, Levene’s test for homogeneity of variance was performed on both metrics. For **vocabulary size**, the assumption of equal variances across the communities was strongly rejected, $F(2, 451) = 36.60$, $p < .001$, indicating massive heteroscedasticity across the groups. The assumption was also violated for **average monthly text entropy**, $F(2, 451) = 3.78$, $p = .023$. Because of these results, we opted not to rely on traditional F-tests. To guarantee valid statistical inferences, all subsequent group comparisons were shifted to alternatives that do not assume equal variances: specifically, Welch’s heteroscedastic one-way ANOVA and post-hoc pairwise Welch$t$-tests with non-pooled standard deviations adjusted via the Bonferroni correction.
+
+**Results**: Network architecture is a strong predictor of both how many words they employ and how much they shift topics month-to-month.
+
+- [Community 3]{.underline} (n = 110) has, on average, the most expansive and dynamically communication profile, commanding the largest unique vocabulary (M = 15,206 words) and the highest monthly topic variance (M = 6.39 entropy units).
+
+- [Community 2]{.underline} (n = 99) follows close behind, exhibiting a wide vocabulary size (M = 11,440 words) and conversational diversity (M = 6.00 entropy units).
+
+- [Community 1]{.underline} despite containing the vast majority of politicians in the network (n = 245) , its members rely on a compressed vocabulary (M = 7,227 words) and maintain the lowest monthly topic shifting (M = 5.75 entropy units).
+
+[**ANOVA**] **Community 3 vs. Community 1 (**$p < 2 \times 10^{-16}$): The main difference encountered is betweeen these two communities, with the former resorting to a broad lexical variance and the latter being much more focused on their messaging. A similar pattern is found when comparing **Community 2 vs. 1 (**$p = 0.009$): Community 2 also exhibits significantly higher monthly entropy than the tightly scripted politicians in Community 1.
+
+```{r}
+# Wolf Analysis
+message("\n--- ROBUST ANALYSIS FOR IS_WOLF GROUPS ---")
+
+# Step A: Print Group Means and Standard Deviations to inspect variance
+message("\n>>> Descriptive Stats & Standard Deviations <<<")
+df_politicians_analysis %>%
+  dplyr::group_by(is_wolf) %>%
+  dplyr::summarise(
+    n             = dplyr::n(),
+    mean_vocab    = mean(vocab_size, na.rm = TRUE),
+    sd_vocab      = sd(vocab_size, na.rm = TRUE),      # Look at the difference here!
+    mean_entropy  = mean(avg_text_entropy, na.rm = TRUE),
+    sd_entropy    = sd(avg_text_entropy, na.rm = TRUE),    # Look at the difference here!
+    .groups = "drop"
+  ) %>%
+  print()
+
+# Step B: Check Homoscedasticity for Wolf Groups
+message("\n>>> Wolf Homoscedasticity Diagnostics (Levene's Test) <<<")
+print(car::leveneTest(vocab_size ~ is_wolf, data = df_politicians_analysis))
+print(car::leveneTest(avg_text_entropy ~ is_wolf, data = df_politicians_analysis))
+
+# Step C: Run Welch's ANOVA for Wolf Groups
+message("\n>>> Welch's ANOVA for Wolf Vocab Size <<<")
+vocab_wolf_welch <- oneway.test(vocab_size ~ is_wolf, data = df_politicians_analysis, var.equal = FALSE)
+print(vocab_wolf_welch)
+
+message("\n>>> Welch's ANOVA for Wolf Entropy <<<")
+entropy_wolf_welch <- oneway.test(avg_text_entropy ~ is_wolf, data = df_politicians_analysis, var.equal = FALSE)
+print(entropy_wolf_welch)
+```
+
+**Summary**: Levene’s test strongly rejected the null hypothesis of equal variances for both vocabulary size, $F(1, 483) = 8.97$, $p = .003$, and average monthly text entropy, $F(1, 483) = 7.66$, $p = .006$.The heteroscedasticity exposed by these tests rendered standard linear models invalid. Consequently, statistical significance was determined using Welch’s heteroscedastic one-way ANOVA, which adjusts the denominator degrees of freedom ($df_{\text{vocab}} = 40$; $df_{\text{entropy}} = 61$) to preserve robust Type I error control.
+
+**Results: The wolf classification identifies a group of politicians characterized by expansive lexicon and exceptionally high, stable conversational fluidity**. With regards to sparsity results, politicians designated as "Wolves" ($n = 39$) command an average unique vocabulary that is nearly double that of standard politicians ($n = 446$), utilizing an average of 17,930 words ($SD = 10,369$) compared to just 9,100 words ($SD = 6,071$) for other politicans. A Welch ANOVA confirmed this lexical difference was highly significant, $F(1, 40) = 27.00$, $p < .001$.
+
+Regarding entropy, wolves exhibit higher topical heterogeneity, maintaining a significantly higher average monthly text entropy (M = 6.55, $SD = 0.40$) than non-wolves (M = 5.86, $SD = 0.71$), $F(1, 61) = 91.00$, $p < .001$. The lower standard deviations for wolves indicate that this group is more homogenous in that regard than their counterparts.
+
+##### Plots
+
+```{r}
+font_add_google("EB Garamond", "EB Garamond")
+showtext_auto()
+
+# Prepare data
+df_plot_wolf <- df_politicians_analysis %>%
+  dplyr::mutate(
+    wolf_label = dplyr::recode_factor(
+      is_wolf, 
+      `0` = "All other parliamentarians", 
+      `1` = "Wolves"
+    )
+  )
+
+# Set consistent layout theme
+theme_wolf <- theme_minimal(base_family = "EB Garamond", base_size = 30) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 40),
+    axis.title = element_text(face = "bold"),
+    legend.position = "none" 
+  )
+
+# Dynamic axis labels that preserve color-mapping names
+axis_labels <- c(
+  "All other parliamentarians" = "All other parliamentarians\n(n=446)",
+  "Wolves" = "Wolves\n(n=39)"
+)
+
+
+# --- Plot 1: Sparsity Analysis (Measured by Vocabulary Size) ---
+# Remove "median.linewidth = 0" if we want the median to show in these plots
+plot_vocab <- ggplot(df_plot_wolf, aes(x = wolf_label, y = vocab_size, color = wolf_label, fill = wolf_label)) +
+  # Jittered raw data points in background
+  geom_jitter(width = 0.25, alpha = 0.3, size = 1.8) +
+  # Overlay descriptive boxplots (forcing black borders)
+  geom_boxplot(width = 0.4, alpha = 0.5, color = "black", outlier.shape = NA, median.linewidth = 0) +
+  # Mean = Diamond marker 
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 5, color = "black", fill = "black") +
+  # Custom Manual Color Scales
+  scale_color_manual(values = group_colors) +
+  scale_fill_manual(values = group_colors) +
+  scale_x_discrete(labels = axis_labels) +
+  scale_y_continuous(labels = scales::comma_format()) +
+  labs(
+    title = "Sparsity Analysis: Vocabulary Size",
+    subtitle = "Welch ANOVA: F(1,40) = 27.0, p < .001",
+    x = NULL,
+    y = "Total Unique Words"
+  ) +
+  theme_wolf
+
+
+# Plot 2: Monthly Entropy (Content Heterogeneity)
+plot_entropy <- ggplot(df_plot_wolf, aes(x = wolf_label, y = avg_text_entropy, color = wolf_label, fill = wolf_label)) +
+  # Jittered raw data points
+  geom_jitter(width = 0.25, alpha = 0.3, size = 1.8) +
+  # Boxplots
+  geom_boxplot(width = 0.4, alpha = 0.5, color = "black", outlier.shape = NA, median.linewidth = 0) +
+  # Mean = Diamond marker 
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 5, color = "black", fill = "black") +
+  # Custom Manual Color Scales
+  scale_color_manual(values = group_colors) +
+  scale_fill_manual(values = group_colors) +
+  scale_x_discrete(labels = axis_labels) +
+  labs(
+    title = "Entropy Analysis",
+    subtitle = "Welch ANOVA: F(1,61) = 91.0, p < .001",
+    x = NULL,
+    y = "Average Monthly Shannon Entropy"
+  ) +
+  theme_wolf
+
+# --- Print Plots ---
+print(plot_vocab)
+print(plot_entropy)
+```
+
+**Sparsity Analysis (Measured by Vocabulary Size) of Wolves vs. All Other Parliamentarians**. *Note*. Distribution of total unique vocabulary size for parliamentarians classified as wolves (n = 39) compared to all other parliamentarians (n = 446). Individual data points are plotted with partial transparency to show sample density. Shaded boxes represent the interquartile range (25th to 75th percentiles), and vertical whiskers indicate the non-outlier data range. Solid black diamonds represent the group means. A Welch’s one-way ANOVA confirmed that wolves have a significantly larger vocabulary than standard parliamentarians, F(1, 40) = 27.00, p \< .001.
+
+**Monthly Entropy (Content Heterogeneity) of Wolves vs. All Other Parliamentarians**. *Note.* Distribution of average monthly Shannon text entropy for parliamentarians classified as wolves (n = 39) compared to all other parliamentarians (n = 446). Individual data points represent monthly averages per parliamentarian. Shaded boxes represent the interquartile range, and vertical whiskers indicate the non-outlier data range. Solid black diamonds explicitly represent the group means. A Welch’s one-way ANOVA confirmed that wolves maintain significantly higher content heterogeneity over time compared to other politicians, F(1, 61) = 91.00, p \< .001.
+
+## Communication Style
+
+```{r}
+# Account-level style summary from df_fb
+style_author <- df_fb %>%
+  dplyr::mutate(
+    programmatic_matches   = dplyr::coalesce(programmatic_matches, 0),
+    parochial_matches      = dplyr::coalesce(parochial_matches, 0),
+    propagandistic_matches = dplyr::coalesce(propagandistic_matches, 0)
+  ) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    # Number of posts by account
+    n_posts = dplyr::n(),
+    
+    # Total dictionary matches by account
+    parochial_matches = sum(parochial_matches, na.rm = TRUE),
+    programmatic_matches = sum(programmatic_matches, na.rm = TRUE),
+    propagandistic_matches = sum(propagandistic_matches, na.rm = TRUE),
+    
+    # Account-level number of posts by dominant style
+    author_parochial_posts = sum(dominant_style == "Parochial", na.rm = TRUE),
+    author_programmatic_posts = sum(dominant_style == "Programmatic", na.rm = TRUE),
+    author_propagandistic_posts = sum(dominant_style == "Propagandistic", na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    # Account-level percentages using each account's own number of posts as baseline
+    ratio_parochial_posts = 100 * author_parochial_posts / n_posts,
+    ratio_programmatic_posts = 100 * author_programmatic_posts / n_posts,
+    ratio_propagandistic_posts = 100 * author_propagandistic_posts / n_posts
+  ) %>%
+  dplyr::left_join(
+    nodes_grouped %>%
+      dplyr::select(author, wolf_group),
+    by = "author"
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::mutate(
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    ))
+
+
+# Group-level style summary
+style_summary <- style_author %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    # Group size and total activity
+    n_members = dplyr::n(),
+    n_posts = sum(n_posts, na.rm = TRUE),
+    
+    # Dictionary matches: means and SDs across accounts
+    mean_parochial_matches = mean(parochial_matches, na.rm = TRUE),
+    sd_parochial_matches = sd(parochial_matches, na.rm = TRUE),
+    
+    mean_programmatic_matches = mean(programmatic_matches, na.rm = TRUE),
+    sd_programmatic_matches = sd(programmatic_matches, na.rm = TRUE),
+    
+    mean_propagandistic_matches = mean(propagandistic_matches, na.rm = TRUE),
+    sd_propagandistic_matches = sd(propagandistic_matches, na.rm = TRUE),
+    
+    # Total number of posts classified into each dominant style
+    count_parochial_posts = sum(author_parochial_posts, na.rm = TRUE),
+    count_programmatic_posts = sum(author_programmatic_posts, na.rm = TRUE),
+    count_propagandistic_posts = sum(author_propagandistic_posts, na.rm = TRUE),
+    
+    # Average number of dominant-style posts per account
+    mean_parochial_posts = mean(author_parochial_posts, na.rm = TRUE),
+    sd_parochial_posts = sd(author_parochial_posts, na.rm = TRUE),
+    
+    mean_programmatic_posts = mean(author_programmatic_posts, na.rm = TRUE),
+    sd_programmatic_posts = sd(author_programmatic_posts, na.rm = TRUE),
+    
+    mean_propagandistic_posts = mean(author_propagandistic_posts, na.rm = TRUE),
+    sd_propagandistic_posts = sd(author_propagandistic_posts, na.rm = TRUE),
+    
+    # Average share of each account's posts classified into each dominant style
+    mean_ratio_parochial_posts = mean(ratio_parochial_posts, na.rm = TRUE),
+    sd_ratio_parochial_posts = sd(ratio_parochial_posts, na.rm = TRUE),
+    
+    mean_ratio_programmatic_posts = mean(ratio_programmatic_posts, na.rm = TRUE),
+    sd_ratio_programmatic_posts = sd(ratio_programmatic_posts, na.rm = TRUE),
+    
+    mean_ratio_propagandistic_posts = mean(ratio_propagandistic_posts, na.rm = TRUE),
+    sd_ratio_propagandistic_posts = sd(ratio_propagandistic_posts, na.rm = TRUE),
+    
+    .groups = "drop"
+  )
+
+
+# Formatted version
+style_summary_formatted <- style_summary %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        n_members,
+        n_posts,
+        count_parochial_posts,
+        count_programmatic_posts,
+        count_propagandistic_posts
+      ),
+      ~ round(.x, 0)
+    ),
+    dplyr::across(
+      starts_with("mean_") | starts_with("sd_"),
+      ~ round(.x, 2)))
+```
+
+#### Plots
+
+```{r}
+style_matches_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_parochial_matches,
+    sd_parochial_matches,
+    mean_programmatic_matches,
+    sd_programmatic_matches,
+    mean_propagandistic_matches,
+    sd_propagandistic_matches
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "style"),
+    names_pattern = "(mean|sd)_(.*)_matches",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    style = dplyr::recode(
+      style,
+      parochial = "Parochial",
+      programmatic = "Programmatic",
+      propagandistic = "Propagandistic"
+    ),
+    style = factor(
+      style,
+      levels = c("Parochial", "Programmatic", "Propagandistic")))
+
+p_style_matches <- ggplot(
+  style_matches_plot_data,
+  aes(x = style, y = mean, fill = wolf_group)
+) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Mean Number of Style Matches per Account, Separated by Group",
+    x = NULL,
+    y = "Mean number of matches per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(legend.position = "bottom")
+
+p_style_matches
+```
+
+```{r}
+style_dominant_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_parochial_posts,
+    sd_parochial_posts,
+    mean_programmatic_posts,
+    sd_programmatic_posts,
+    mean_propagandistic_posts,
+    sd_propagandistic_posts
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "style"),
+    names_pattern = "(mean|sd)_(.*)_posts",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    style = dplyr::recode(
+      style,
+      parochial = "Parochial",
+      programmatic = "Programmatic",
+      propagandistic = "Propagandistic"
+    ),
+    style = factor(
+      style,
+      levels = c("Parochial", "Programmatic", "Propagandistic")
+    )
+  )
+
+p_dominant_style_posts <- ggplot(
+  style_dominant_plot_data,
+  aes(x = style, y = mean, fill = wolf_group)
+) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Mean Number of Dominant-Style Posts by Group",
+    x = NULL,
+    y = "Mean number of posts per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom"
+  )
+
+p_dominant_style_posts
+```
+
+```{r}
+style_dominant_ratio_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_ratio_parochial_posts,
+    sd_ratio_parochial_posts,
+    mean_ratio_programmatic_posts,
+    sd_ratio_programmatic_posts,
+    mean_ratio_propagandistic_posts,
+    sd_ratio_propagandistic_posts
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "style"),
+    names_pattern = "(mean|sd)_ratio_(.*)_posts",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    style = dplyr::recode(
+      style,
+      parochial = "Parochial",
+      programmatic = "Programmatic",
+      propagandistic = "Propagandistic"
+    ),
+    style = factor(
+      style,
+      levels = c("Parochial", "Programmatic", "Propagandistic")
+    )
+  )
+
+p_dominant_style_ratios <- ggplot(
+  style_dominant_ratio_plot_data,
+  aes(x = style, y = mean, fill = wolf_group)
+) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(
+    labels = function(x) paste0(x, "%")
+  ) +
+  labs(
+    title = "Dominant Styles by Group",
+    x = NULL,
+    y = "Mean share of posts per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom")
+
+p_dominant_style_ratios
+```
+
+#### Negativity
+
+```{r}
+#  negativity_analysis <- readr::read_rds(
+#   "C:/Users/andre/OneDrive/UT Austin/Dissertation [PhD UT]/Dissertation Articles/Lacracao Logic/_processed_data/fb_analysis.rds"
+# )
+#Inspect
+# glimpse(negativity_analysis)
+
+negativity_author <- negativity_analysis %>%
+  dplyr::mutate(
+    lacracao_matches = dplyr::coalesce(lacracao_matches, 0),
+    compound_sentiment = as.numeric(compound_sentiment),
+    
+    # Negative intensity: post has compound sentiment below zero
+    has_negative_intensity = compound_sentiment < 0,
+    
+    # Antagonistic post: post has at least one lacracao/antagonistic match
+    has_antagonistic_match = lacracao_matches >= 1
+  ) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    # Total lacracao / antagonistic matches by account
+    lacracao_matches = sum(lacracao_matches, na.rm = TRUE),
+    
+    # Mean compound sentiment by account
+    mean_compound_sentiment_author = mean(compound_sentiment, na.rm = TRUE),
+    
+    # Count of posts with negative intensity by account
+    count_negative_intensity_posts_author = sum(
+      has_negative_intensity,
+      na.rm = TRUE
+    ),
+    
+    # Count of antagonistic posts by account
+    count_antagonistic_posts_author = sum(
+      has_antagonistic_match,
+      na.rm = TRUE
+    ),
+    
+    .groups = "drop"
+  ) %>%
+  dplyr::left_join(
+    nodes_grouped %>%
+      dplyr::select(author, wolf_group),
+    by = "author"
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::mutate(
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  )
+
+
+# Group-level negativity/style summary
+negativity_summary <- negativity_author %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    # Lacracao / antagonistic matches
+    mean_lacracao_matches = mean(lacracao_matches, na.rm = TRUE),
+    sd_lacracao_matches = sd(lacracao_matches, na.rm = TRUE),
+    
+    # Compound sentiment
+    mean_compound_sentiment = mean(
+      mean_compound_sentiment_author,
+      na.rm = TRUE
+    ),
+    sd_compound_sentiment = sd(
+      mean_compound_sentiment_author,
+      na.rm = TRUE
+    ),
+    
+    # Posts with negative intensity
+    count_negative_intensity_posts = sum(
+      count_negative_intensity_posts_author,
+      na.rm = TRUE
+    ),
+    mean_negative_intensity_posts = mean(
+      count_negative_intensity_posts_author,
+      na.rm = TRUE
+    ),
+    sd_negative_intensity_posts = sd(
+      count_negative_intensity_posts_author,
+      na.rm = TRUE
+    ),
+    
+    # Antagonistic posts
+    count_antagonistic_posts = sum(
+      count_antagonistic_posts_author,
+      na.rm = TRUE
+    ),
+    mean_antagonistic_posts = mean(
+      count_antagonistic_posts_author,
+      na.rm = TRUE
+    ),
+    sd_antagonistic_posts = sd(
+      count_antagonistic_posts_author,
+      na.rm = TRUE
+    ),
+    
+    .groups = "drop"
+  )
+
+
+# Add negativity variables to style_summary
+style_summary <- style_summary %>%
+  dplyr::left_join(
+    negativity_summary,
+    by = "wolf_group"
+  )
+
+
+# Recreate formatted version after all variables have been added
+style_summary_formatted <- style_summary %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        n_members,
+        n_posts,
+        count_parochial_posts,
+        count_programmatic_posts,
+        count_propagandistic_posts,
+        count_negative_intensity_posts,
+        count_antagonistic_posts
+      ),
+      ~ round(.x, 0)
+    ),
+    dplyr::across(
+      starts_with("mean_") | starts_with("sd_"),
+      ~ round(.x, 2)
+    )
+  )
+
+# Inspect
+style_summary
+style_summary_formatted
+```
+
+```{r}
+style_matches_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_parochial_matches,
+    sd_parochial_matches,
+    mean_programmatic_matches,
+    sd_programmatic_matches,
+    mean_propagandistic_matches,
+    sd_propagandistic_matches,
+    mean_lacracao_matches,
+    sd_lacracao_matches
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "style"),
+    names_pattern = "(mean|sd)_(.*)_matches",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    style = dplyr::recode(
+      style,
+      parochial = "Parochial",
+      programmatic = "Programmatic",
+      propagandistic = "Propagandistic",
+      lacracao = "Antagonistic"
+    ),
+    style = factor(
+      style,
+      levels = c(
+        "Parochial",
+        "Programmatic",
+        "Propagandistic",
+        "Antagonistic"
+      )
+    )
+  )
+
+p_style_matches <- ggplot(
+  style_matches_plot_data,
+  aes(x = style, y = mean, fill = wolf_group)
+) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Mean Dictionary Matches per Account by Group and Style",
+    x = NULL,
+    y = "Mean number of matches per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom"
+  )
+
+p_style_matches
+```
+
+```{r}
+compound_sentiment_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_compound_sentiment,
+    sd_compound_sentiment
+  )
+
+p_compound_sentiment <- ggplot(
+  compound_sentiment_plot_data,
+  aes(x = wolf_group, y = mean_compound_sentiment, fill = wolf_group)
+) +
+  geom_col(
+    width = 0.65
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = mean_compound_sentiment - sd_compound_sentiment,
+      ymax = mean_compound_sentiment + sd_compound_sentiment
+    ),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = group_colors) +
+  labs(
+    title = "Mean Compound Sentiment by Group",
+    x = NULL,
+    y = "Mean compound sentiment per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "none"
+  )
+
+p_compound_sentiment
+```
+
+```{r}
+antagonistic_posts_summary <- negativity_analysis %>%
+  dplyr::mutate(
+    lacracao_matches = dplyr::coalesce(lacracao_matches, 0),
+    has_antagonistic_match = lacracao_matches >= 1
+  ) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    count_antagonistic_posts_author = sum(has_antagonistic_match, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::left_join(
+    nodes_grouped %>%
+      dplyr::select(author, wolf_group),
+    by = "author"
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    count_antagonistic_posts = sum(count_antagonistic_posts_author, na.rm = TRUE),
+    mean_antagonistic_posts = mean(count_antagonistic_posts_author, na.rm = TRUE),
+    sd_antagonistic_posts = sd(count_antagonistic_posts_author, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+negative_antagonistic_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_negative_intensity_posts,
+    sd_negative_intensity_posts,
+    mean_antagonistic_posts,
+    sd_antagonistic_posts
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "post_type"),
+    names_pattern = "(mean|sd)_(.*)_posts",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    post_type = dplyr::recode(
+      post_type,
+      negative_intensity = "Negative-intensity posts",
+      antagonistic = "Antagonistic posts"
+    ),
+    post_type = factor(
+      post_type,
+      levels = c("Negative-intensity posts", "Antagonistic posts")
+    )
+  )
+
+p_negative_antagonistic_posts <- ggplot(
+  negative_antagonistic_plot_data,
+  aes(
+    x = wolf_group,
+    y = mean,
+    fill = post_type
+  )
+) +
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Negative-intensity posts" = "coral1",
+      "Antagonistic posts" = "black"
+    )
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Mean Number of Negative and Antagonistic Posts by Group",
+    x = NULL,
+    y = "Mean number of posts per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom"
+  )
+
+p_negative_antagonistic_posts
+```
+
+```{r}
+negative_antagonistic_plot_data <- style_summary %>%
+  dplyr::select(
+    wolf_group,
+    mean_negative_intensity_posts,
+    sd_negative_intensity_posts,
+    mean_antagonistic_posts,
+    sd_antagonistic_posts
+  ) %>%
+  tidyr::pivot_longer(
+    cols = -wolf_group,
+    names_to = c("stat", "post_type"),
+    names_pattern = "(mean|sd)_(.*)_posts",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  dplyr::mutate(
+    post_type = dplyr::recode(
+      post_type,
+      negative_intensity = "Negative-intensity posts",
+      antagonistic = "Antagonistic posts"
+    ),
+    post_type = factor(
+      post_type,
+      levels = c(
+        "Negative-intensity posts",
+        "Antagonistic posts"
+      )
+    )
+  )
+
+
+p_negative_antagonistic_posts <- ggplot(
+  negative_antagonistic_plot_data,
+  aes(
+    x = wolf_group,
+    y = mean,
+    fill = wolf_group
+  )
+) +
+  geom_col(
+    width = 0.65
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = pmax(mean - sd, 0),
+      ymax = mean + sd
+    ),
+    width = 0.1,
+    linewidth = 0.8
+  ) +
+  facet_wrap(
+    ~ post_type,
+    scales = "free_y"
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Mean Number of Negative and Antagonistic Posts by Group",
+    x = NULL,
+    y = "Mean number of posts per account",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+
+p_negative_antagonistic_posts
+```
+
+###### ANOVA
+
+```{r}
+# Account-level dataset for ANOVA
+negative_antagonistic_anova_data <- negativity_analysis %>%
+  dplyr::mutate(
+    lacracao_matches = dplyr::coalesce(lacracao_matches, 0),
+    compound_sentiment = as.numeric(compound_sentiment),
+    
+    has_negative_intensity = compound_sentiment < 0,
+    has_antagonistic_match = lacracao_matches >= 1
+  ) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    n_posts = dplyr::n(),
+    
+    count_negative_intensity_posts = sum(has_negative_intensity, na.rm = TRUE),
+    count_antagonistic_posts = sum(has_antagonistic_match, na.rm = TRUE),
+    
+    ratio_negative_intensity_posts =
+      100 * count_negative_intensity_posts / n_posts,
+    ratio_antagonistic_posts =
+      100 * count_antagonistic_posts / n_posts,
+    
+    .groups = "drop"
+  ) %>%
+  dplyr::left_join(
+    nodes_grouped %>%
+      dplyr::select(author, wolf_group),
+    by = "author"
+  ) %>%
+  dplyr::filter(!is.na(wolf_group)) %>%
+  dplyr::mutate(
+    wolf_group = factor(
+      wolf_group,
+      levels = c("All other parliamentarians", "Wolves")
+    )
+  )
+```
+
+```{r}
+anova_negative_intensity_posts <- aov(
+  count_negative_intensity_posts ~ wolf_group,
+  data = negative_antagonistic_anova_data
+)
+
+anova_antagonistic_posts <- aov(
+  count_antagonistic_posts ~ wolf_group,
+  data = negative_antagonistic_anova_data
+)
+
+# Tidy results
+anova_negative_intensity_posts_tidy <- broom::tidy(anova_negative_intensity_posts)
+anova_antagonistic_posts_tidy <- broom::tidy(anova_antagonistic_posts)
+
+# Eta squared
+anova_negative_intensity_posts_eta <- eta_squared_from_aov(anova_negative_intensity_posts)
+anova_antagonistic_posts_eta <- eta_squared_from_aov(anova_antagonistic_posts)
+
+# Inspect
+summary(anova_negative_intensity_posts)
+anova_negative_intensity_posts_tidy
+anova_negative_intensity_posts_eta
+
+summary(anova_antagonistic_posts)
+anova_antagonistic_posts_tidy
+anova_antagonistic_posts_eta
+```
+
+# TO BE REVISED
+
+```{r}
+# Plot domain category usage
+p_domain_usage <- ggplot(
+  domain_usage_plot_data,
+  aes(
+    x = measure,
+    y = value,
+    fill = wolf_group
+  )
+) +
+  geom_col(
+    position = position_dodge(width = 0.75),
+    width = 0.65
+  ) +
+  facet_wrap(
+    ~ measure,
+    scales = "free_y",
+    nrow = 1
+  ) +
+  scale_fill_manual(values = group_colors) +
+  scale_y_continuous(
+    labels = function(x) {
+      dplyr::case_when(
+        max(x, na.rm = TRUE) <= 100 ~ paste0(round(x, 1), "%"),
+        TRUE ~ scales::comma(x)
+      )
+    },
+    expand = expansion(mult = c(0, 0.08))
+  ) +
+  labs(
+    title = "Media Domain Usage by Group",
+    subtitle = "Mainstream and hyper-partisan values use each group’s total domain references as the baseline",
+    x = NULL,
+    y = NULL,
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    strip.text = element_text(size = 28, face = "bold"),
+    plot.title = element_text(size = 34, face = "bold"),
+    plot.subtitle = element_text(size = 28)
+  )
+
+p_domain_usage
+```
+
+```{r}
+ggsave(
+  filename = file.path(output_path, "domain_usage_by_group.png"),
+  plot = p_domain_usage,
+  width = 7,
+  height = 4,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+###Ideology
+
+```{r}
+# ----------------------------
+# Media ideological scores
+# ----------------------------
+media_ideology_scores <- tibble::tribble(
+  ~news_outlet, ~domain_key, ~ideological_score, ~audience_leaning,
+  "Diário do Centro do Mundo", "diariodocentrodomundo", -0.20, "left",
+  "Brasil 247", "brasil247", -0.18, "left",
+  "Folha de S. Paulo", "folha", -0.09, "left",
+  "Fórum", "forum", -0.09, "left",
+  "Brasil de Fato", "brasildefato", -0.08, "left",
+  "BBC Brasil", "bbc", -0.05, "not_partisan",
+  "G1", "g1globo", -0.04, "not_partisan",
+  "Globo", "globo", -0.02, "not_partisan",
+  "O Povo", "opovo", -0.02, "not_partisan",
+  "O Globo", "ogloboglobo", -0.02, "not_partisan",
+  "UOL", "uol", -0.01, "not_partisan",
+  "O Estado de S. Paulo", "estadao", -0.01, "not_partisan",
+  "Metrópoles", "metropoles", -0.01, "not_partisan",
+  "CNN Brasil", "cnnbrasil", 0.00, "not_partisan",
+  "Poder 360", "poder360", 0.03, "not_partisan",
+  "Band", "band", 0.04, "not_partisan",
+  "SBT", "sbt", 0.06, "not_partisan",
+  "R7", "r7", 0.07, "not_partisan",
+  "Record TV", "recordtv", 0.11, "not_partisan",
+  "Jovem Pan", "jovempan", 0.16, "right",
+  "Gazeta do Povo", "gazetadopovo", 0.18, "right",
+  "Oeste", "revistaoeste", 0.22, "right",
+  "O Antagonista", "oantagonista", 0.23, "right",
+  "Jornal da Cidade Online", "jornaldacidadeonline", 0.39, "right"
+) %>%
+  dplyr::mutate(
+    domain_key = clean_domain_key(domain_key),
+    audience_leaning = factor(
+      audience_leaning,
+      levels = c("left", "not_partisan", "right")
+    )
+  )
+
+media_ideology_scores
+```
+
+```{r}
+# ----------------------------
+# Prepare account-domain long data
+# ----------------------------
+domain_ideology_long <- account_by_media_domain_counts %>%
+  tidyr::pivot_longer(
+    cols = -author,
+    names_to = "domain",
+    values_to = "n"
+  ) %>%
+  dplyr::mutate(
+    domain_key = clean_domain_key(domain)
+  ) %>%
+  dplyr::inner_join(
+    media_ideology_scores %>%
+      dplyr::distinct(domain_key, .keep_all = TRUE),
+    by = "domain_key"
+  ) %>%
+  dplyr::left_join(
+    nodes_grouped %>%
+      dplyr::select(author, wolf_group),
+    by = "author"
+  ) %>%
+  dplyr::filter(!is.na(wolf_group))
+
+# ----------------------------
+# Account-level ideology summary
+# ----------------------------
+domain_ideology_author_summary <- domain_ideology_long %>%
+  dplyr::group_by(author, wolf_group) %>%
+  dplyr::summarise(
+    total_domain_mentions = sum(n, na.rm = TRUE),
+    
+    left_mentions = sum(n[audience_leaning == "left"], na.rm = TRUE),
+    not_partisan_mentions = sum(n[audience_leaning == "not_partisan"], na.rm = TRUE),
+    right_mentions = sum(n[audience_leaning == "right"], na.rm = TRUE),
+    
+    weighted_ideological_score = dplyr::if_else(
+      total_domain_mentions > 0,
+      sum(ideological_score * n, na.rm = TRUE) / total_domain_mentions,
+      NA_real_
+    ),
+    
+    share_left = dplyr::if_else(
+      total_domain_mentions > 0,
+      left_mentions / total_domain_mentions,
+      NA_real_
+    ),
+    share_not_partisan = dplyr::if_else(
+      total_domain_mentions > 0,
+      not_partisan_mentions / total_domain_mentions,
+      NA_real_
+    ),
+    share_right = dplyr::if_else(
+      total_domain_mentions > 0,
+      right_mentions / total_domain_mentions,
+      NA_real_
+    ),
+    
+    .groups = "drop"
+  )
+
+# ----------------------------
+# Group-level ideology summary
+# ----------------------------
+domain_ideology_summary <- domain_ideology_author_summary %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    n_accounts = dplyr::n_distinct(author),
+    n_accounts_with_matched_domains = sum(total_domain_mentions > 0, na.rm = TRUE),
+    
+    # Total number of matched domain mentions in media_ideology_scores
+    total_domain_mentions = sum(total_domain_mentions, na.rm = TRUE),
+    
+    # Raw category totals
+    left_mentions = sum(left_mentions, na.rm = TRUE),
+    not_partisan_mentions = sum(not_partisan_mentions, na.rm = TRUE),
+    right_mentions = sum(right_mentions, na.rm = TRUE),
+    
+    # Group-level weighted ideological score:
+    # sum(score * mentions) / total matched mentions in the group
+    average_ideological_score = sum(
+      weighted_ideological_score * total_domain_mentions,
+      na.rm = TRUE
+    ) / total_domain_mentions,
+    
+    # SD of account-level weighted ideological scores
+    sd_ideological_score = sd(
+      weighted_ideological_score,
+      na.rm = TRUE
+    ),
+    
+    # Category averages using total group mentions as baseline
+    average_left = left_mentions / total_domain_mentions,
+    average_not_partisan = not_partisan_mentions / total_domain_mentions,
+    average_right = right_mentions / total_domain_mentions,
+    
+    # SDs of account-level category shares
+    sd_left = sd(share_left, na.rm = TRUE),
+    sd_not_partisan = sd(share_not_partisan, na.rm = TRUE),
+    sd_right = sd(share_right, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        average_left,
+        average_not_partisan,
+        average_right,
+        sd_left,
+        sd_not_partisan,
+        sd_right
+      ),
+      ~ 100 * .x
+    )
+  )
+
+domain_ideology_summary
+```
+
+### Plot ideological domain usage by group
+
+```{r}
+# ----------------------------
+# Summarise domain mentions by group and outlet
+# ----------------------------
+
+domain_ideology_plot_summary <- domain_ideology_long %>%
+  dplyr::group_by(
+    wolf_group,
+    news_outlet,
+    domain_key,
+    ideological_score,
+    audience_leaning
+  ) %>%
+  dplyr::summarise(
+    domain_mentions = sum(n, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::mutate(
+    total_domain_mentions_group = sum(domain_mentions, na.rm = TRUE),
+    share_of_group_mentions = domain_mentions / total_domain_mentions_group,
+    pct_of_group_mentions = 100 * share_of_group_mentions
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(ideological_score) %>%
+  dplyr::mutate(
+    news_outlet_ordered = factor(
+      news_outlet,
+      levels = media_ideology_scores %>%
+        dplyr::arrange(ideological_score) %>%
+        dplyr::pull(news_outlet)
+    )
+  )
+
+# Inspect summary object
+domain_ideology_plot_summary
+
+# ----------------------------
+# Plot
+# ----------------------------
+
+p_domain_ideology_baseline <- ggplot(
+  domain_ideology_plot_summary,
+  aes(
+    x = news_outlet_ordered,
+    y = pct_of_group_mentions,
+    fill = audience_leaning
+  )
+) +
+  geom_col(width = 0.75) +
+  facet_wrap(
+    ~ wolf_group,
+    ncol = 1,
+    scales = "free_y"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "left" = "darkred",
+      "not_partisan" = "grey60",
+      "right" = "navyblue"
+    ),
+    labels = c(
+      "left" = "Left",
+      "not_partisan" = "Not partisan",
+      "right" = "Right"
+    )
+  ) +
+  scale_x_discrete(
+    labels = function(x) stringr::str_wrap(x, width = 12)
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0(round(x, 1), "%"),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  labs(
+    title = "Use of Media Domains by Audience Ideological Leaning",
+    subtitle = "Each outlet's value is calculated as a share of all matched domain mentions within each group",
+    x = "Media outlet, ordered by audience ideological score",
+    y = "Share of group's matched domain mentions",
+    fill = NULL
+  ) +
+  theme_wolves() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      size = 18
+    ),
+    axis.text.y = element_text(size = 24),
+    axis.title.x = element_text(size = 26),
+    axis.title.y = element_text(size = 26),
+    plot.title = element_text(size = 34, face = "bold"),
+    plot.subtitle = element_text(size = 22),
+    strip.text = element_text(size = 28, face = "bold")
+  )
+
+p_domain_ideology_baseline
+```
+
+```{r}
+ggsave(
+  filename = file.path(output_path, "media_domain_ideology_by_group.png"),
+  plot = p_domain_ideology_baseline,
+  width = 10,
+  height = 7,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```

@@ -1,0 +1,579 @@
+---
+title: "_1_TextualAnalysis"
+author: "André K. Rodarte"
+date: "2026-05-07"
+output: html_document
+---
+
+```{r setup, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+library(here)
+library(tidyverse)
+library(tidytext)
+library(tokenizers)
+library("lexiconPT")
+library(readr)
+library(dplyr)
+library(stringi)
+library(rlang)
+library(fuzzyjoin)
+library(stringi)
+library(tibble)
+library(purrr)
+library(tidyr)
+library(stringr)
+```
+
+**Set up**
+
+```{r}
+# Set working directory
+setwd("C:/Users/andre/Documents/UT GitHub/VotingMachines")
+
+
+# Cleaning set up
+clean_text <- function(x) {
+  x %>%
+    stringi::stri_trans_general(id = "Latin-ASCII") %>%
+    tolower() %>%
+    gsub("[[:punct:]]", "", ., perl = TRUE) %>%
+    gsub("[^[:print:]]", "", ., perl = TRUE) %>%
+    gsub("🄲|🯲", "", ., perl = TRUE)
+}
+
+# Formatting options
+format_p_apa <- function(p) {
+  dplyr::case_when(
+    is.na(p)        ~ NA_character_,
+    p < .001        ~ "< .001",
+    p < .01         ~ paste0("= .", stringr::str_pad(round(p, 3) * 1000, 3, pad = "0")),
+    p < .05         ~ paste0("= .", stringr::str_pad(round(p, 3) * 1000, 3, pad = "0")),
+    TRUE            ~ paste0("= .", stringr::str_pad(round(p, 2) * 100, 2, pad = "0"))
+  )
+}
+
+# Textual analysis function
+make_re <- function(keywords) {
+  # whole-word boundary for Unicode letters:
+  # not preceded by a letter, not followed by a letter
+  str_c("(?<!\\p{L})(?:", str_c(keywords, collapse = "|"), ")(?!\\p{L})")
+}
+
+count_re <- function(x, re) {
+  stringi::stri_count_regex(
+    x, re,
+    opts_regex = stringi::stri_opts_regex(
+      case_insensitive = FALSE,
+      dotall = TRUE
+      # uword not needed when you already control boundaries with lookarounds
+    )
+  )
+}
+
+
+
+sig_stars <- function(p) {
+  dplyr::case_when(
+    is.na(p) ~ "",
+    p < .001 ~ "***",
+    p < .01  ~ "**",
+    p < .05  ~ "*",
+    TRUE     ~ ""
+  )
+}
+```
+
+## Format text
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+df_FB <- readr::read_csv(
+  here::here("..", "_data",
+             "Updated_FB_Data_with_OCR.csv"),
+  show_col_types = FALSE) %>%
+  dplyr::select(
+    -id, -unix_timestamp, -page_category, -page_top_country,
+    -page_description, -sponsor_name, -sponsor_id, -sponsor_category
+  ) %>%
+  dplyr::mutate(
+    timestamp = as.POSIXct(timestamp, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+  ) %>%
+  dplyr::filter(
+    timestamp >= as.POSIXct("2019-01-01 00:00:00", tz = "UTC") &
+      timestamp <= as.POSIXct("2022-12-30 23:59:59", tz = "UTC")
+  ) %>%
+  dplyr::mutate(postID = dplyr::row_number())
+
+
+
+df_FB <- df_FB %>%
+  mutate(across(
+    c(body, body_image, body_link, body_description, ocr_text),
+    clean_text
+  ))
+
+#Combine text
+df_FB <- df_FB %>%
+  mutate(
+    text_combined = paste(
+      coalesce(body, ""),
+      coalesce(body_image, ""),
+      coalesce(body_link, ""),
+      coalesce(body_description, ""),
+      coalesce(ocr_text, ""),
+      sep = " "
+    ) %>%
+      str_squish()  
+  )
+```
+
+```{r}
+df_FB$post_format <- dplyr::recode(df_FB$type, 
+                         #Visual formats
+                         "Photo" = "Image",
+                         #Textual formats
+                         "Link" = "Text", 
+                         "Status" = "Text", 
+                         #Video formats
+                         "Native Video" = "Video", 
+                         "Video" = "Video", 
+                         "Live Video Complete" = "Video", 
+                         "YouTube" = "Video", 
+                         "Live Video Scheduled" = "Video", 
+                         "Live Video" = "Video")
+
+df_FB$post_format <- factor(df_FB$post_format, levels = c("Image", "Video", "Text"))
+
+# Followers
+df_FB$page_followers <- as.numeric(gsub("[^0-9]", "", df_FB$page_followers))
+
+# Hashtags
+df_FB$has_hashtags <- ifelse(is.na(df_FB$hashtags) | df_FB$hashtags == "", 0, 1)
+df_FB$has_hashtags <- factor(df_FB$has_hashtags)
+
+#ENGAGEMENT
+df_FB <- df_FB %>%
+  mutate(engagement = rowSums(dplyr::select(., 
+    likes, likes_love, likes_wow, likes_haha, 
+    likes_sad, likes_angry, likes_care, 
+    comments, shares), 
+    na.rm = TRUE))
+
+# Dealing with exceptions
+df_FB <- df_FB %>%
+  dplyr::mutate(
+    author = dplyr::if_else(
+      author == "geninhozuliani.pag",
+      "geninhozuliani",
+      author
+    )
+  )
+```
+
+
+```{r}
+deputados_df_handles <- read_csv("C:/Users/andre/OneDrive/UT Austin/Dissertation [PhD UT]/Dissertation Articles/Lacracao Logic/_unprocessed_data/Platform_Handles.csv") 
+
+norm_key <- function(x) {
+  x %>%
+    as.character() %>%
+    stringi::stri_trans_general("Latin-ASCII") %>%
+    str_to_lower() %>%
+    str_replace("^@", "") %>%
+    str_replace_all("[0-9]+", "") %>% 
+    str_replace_all("[^a-z0-9]", "") %>%
+    str_squish()
+}
+  
+# Safe left join with exact match
+handles_unique <- deputados_df_handles %>%
+  dplyr::mutate(fb_key = norm_key(facebook_handle)) %>%
+  dplyr::filter(!is.na(fb_key), fb_key != "") %>%
+  dplyr::distinct(fb_key, .keep_all = TRUE) %>%
+  dplyr::select(fb_key, party, state)
+
+
+# Join into df_FB
+df_FB <- df_FB %>%
+  dplyr::mutate(fb_key = norm_key(author)) %>%
+  dplyr::left_join(handles_unique, by = "fb_key")  %>%
+  dplyr::select(-fb_key)
+ 
+ #Check
+ # unmatched_authors <- df_FB %>%
+ #  dplyr::filter(is.na(party)) %>%
+ #  dplyr::distinct(author) %>%
+ #  dplyr::arrange(author)
+
+ # Exceptions
+ df_FB <- df_FB %>%
+  dplyr::mutate(
+    party = dplyr::case_when(
+      author == "cleberverde.1010"     ~ "REPUBLICANOS",
+      author == "deputadojoaocampos"   ~ "PSB",
+      author == "joaobacelaroficial"   ~ "PL",
+      TRUE ~ party
+    ),
+    state = dplyr::case_when(
+      author == "cleberverde.1010"     ~ "MA",
+      author == "deputadojoaocampos"   ~ "PE",
+      author == "joaobacelaroficial"   ~ "BA",
+      TRUE ~ state
+    )
+  )
+```
+
+##### Parties' Ideology
+```{r}
+# List of parties and their respective ideological score
+parties <- read_csv("C:/Users/andre/OneDrive/UT Austin/Dissertation [PhD UT]/Dissertation Articles/Lacracao Logic/_unprocessed_data/parties.csv")
+
+df_FB <- df_FB %>%
+  mutate(party = str_to_upper(party))   
+
+parties <- parties %>%
+  mutate(Party = str_to_upper(Party))
+
+# Join ideological score
+df_FB <- df_FB %>%
+  left_join(
+    parties %>% dplyr::select(Party, `2021_ideological_score`),
+    by = c("party" = "Party")
+  )
+```
+
+Note: I added the same ideological score as SOLIDARIEDADE to PROS considering: <https://www.tse.jus.br/comunicacao/noticias/2023/Fevereiro/partido-republicano-da-ordem-social-pros-e-incorporado-ao-solidariedade>. By the same criterium, I gave the same ideological score to PTB and PATRIOTA: <https://www.cnnbrasil.com.br/politica/tse-aprova-fusao-de-ptb-e-patriota-e-novo-partido-tera-direito-a-r-228-mi/>.
+
+#### PEC135
+
+**Adding information about parliamentarians and how they voted**. Information about votes taken from: <https://www.camara.leg.br/presenca-comissoes/votacao-portal?reuniao=62583&itemVotacao=9968>.
+<https://www.cartacapital.com.br/cartaexpressa/pec-do-voto-impresso-veja-como-votou-cada-deputado/>.
+
+
+```{r}
+handles <- readr::read_csv(
+  "data/Platform_Handles_Voting_Records.csv",
+  col_types = cols(PEC135 = col_double())
+) 
+
+handles_pec <- handles %>%
+  dplyr::select(facebook_handle, PEC135) %>%
+  dplyr::distinct(facebook_handle, .keep_all = TRUE)
+
+df_FB_with_PEC135 <- df_FB %>%
+  dplyr::left_join(
+    handles_pec,
+    by = c("author" = "facebook_handle")
+  )
+
+# Check
+# 5. Check how many posts received PEC135 information
+df_FB_with_PEC135 %>%
+  dplyr::summarise(
+    total_posts = dplyr::n(),
+    matched_posts = sum(!is.na(PEC135)),
+    unmatched_posts = sum(is.na(PEC135)),
+    matched_prop = mean(!is.na(PEC135))
+  )
+
+# Inspect
+unmatched_authors <- df_FB_with_PEC135 %>%
+  dplyr::filter(is.na(PEC135)) %>%
+  dplyr::distinct(author) %>%
+  dplyr::arrange(author)
+
+df_FB_with_PEC135 %>%
+  dplyr::distinct(author, PEC135) %>%
+  dplyr::count(PEC135)
+```
+
+449 deputados registraram voto na PEC 135/19 e cerca de 64 deputados não tiveram voto computado — ou estavam ausentes ou não interagiram com o painel. Há 192 parlamentares que votaram a favor da PEC e estão no sample. Há 201 que votaram contra e estão no sample. 92 não tiveram match. 
+
+# Communication Style
+
+```{r}
+keywords_parochial <- c(
+  # support / credit-claiming / delivery
+  "apoio",
+  "apoi(?:ar|o|a|am|amos|ei|ou|aram|ando|ad[oa]s?)",
+
+  # infrastructure / public works
+  "asfaltic[oa]s?",
+  "calcad(?:a|as)?",
+  "infraestrutura",
+  "investimento(?:s)?",
+  "obra(?:s)?",
+  "paviment(?:ar|a|ou|amos|aram|ando)",
+  "pavimentac(?:ao|oes)",
+  "recapeamento(?:s)?",
+  "revitalizac(?:ao|oes)",
+
+  # goods/services delivered
+  "assistencia(?:s)?",
+  "beneficio(?:s)?",
+  "equipamento(?:s)?",
+  "exame(?:s)?",
+  "mobiliari[oa]s?",
+  "multira(?:o|os)",
+
+  # earmarks
+  "liberei",
+  "repass(?:ar|o|a|am|amos|ei|ou|aram|ando|ad[oa]s?)",
+  "destin(?:ar|o|a|am|amos|ei|ou|aram|ando|ad[oa]s?)",
+  "custeio",
+  "emenda(?:s)?",
+  "recurso(?:s)?",
+  "verba(?:s)?",
+  "repasse(?:s)?",
+  "remessa(?:s)?",
+  "destinad[ao]s?",
+  "destinacao",
+  "milha(?:o|oes)",
+
+  # local politics / municipal actors
+  "municipal(?:es)?",
+  "municipio(?:s)?",
+  "lideranc(?:a|as)",
+  "prefeit(?:o|a|os|as)",
+  "prefeitura(?:s)?",
+  "vereador(?:a|as|es)?",
+  "secretari[ao]s?",
+  "superintendente(?:s)?",
+  "gestor[ae]s? municipal(?:es)?",
+  "demandas do municipio",
+  "demandas municipais",
+  "necessidade(?:s)?"
+)
+
+pattern_parochial <- paste(keywords_parochial, collapse = "|")
+
+
+#######################################
+#######################################
+keywords_programmatic <- c(
+  # institutional arenas
+  "ccj",
+  "comiss(?:ao|oes)",
+  "plenario",
+  "pauta(?:s)?",
+  "pautar",
+  "sess(?:ao|oes)",
+  "tramit(?:ar|e)",
+  "tramitac(?:ao|oes)",
+  "urgencia",
+
+  # core legislative objects
+  "lei(?:s)?",
+  "legislacao",
+  "legislativo",
+  "projeto(?:s)?",
+  "decreto(?:s)?",
+  "medida(?:s)?",
+  "dispositivo(?:s)?",
+  "materia(?:s)?",
+  "normativ[oa]s?",
+  "diretriz(?:es)?",
+  "mudancas no codigo",
+
+  # legality / constitutionality
+  "constitucional(?:idade)?",
+  "inconstitucional(?:idade)?",
+
+  # deliberation / evaluation
+  "analise(?:s)?",
+  "analisad[oa]s?",
+  "apreci(?:ar|ac(?:ao|oes))",
+  "articulac(?:ao|oes)",
+  "articulad[oa]s?",
+  "deliberac(?:ao|oes)",
+  "debate(?:s)?",
+  "definic(?:ao|oes)",
+  "validade",
+
+  # approval / enactment
+  "aprova(?:r|c(?:ao|oes))",
+  "aprovad[oa]s?",
+  "promulgac(?:ao|oes)",
+  "promulgar",
+  "publicac(?:ao|oes)",
+  "sanc(?:ao|ionar|ionad[ao]s?)",
+  "veto(?:s)?",
+  "vetar",
+  "vigor",
+
+  # regulation / reform
+  "reforma(?:s)?",
+  "regimental",
+  "regimento",
+  "regulamentac(?:ao|oes)",
+  "regulamentar",
+  "revog(?:ar|ac(?:ao|oes))?",
+  "suprimir",
+  "suspens(?:ao|oes)",
+  "suspender",
+  "proibic(?:ao|oes)",
+  "isenc(?:ao|oes)",
+
+  # legislative protocols
+  "coautora?s?",
+  "oficio(?:s)?",
+  "parecer(?:es)?",
+  "redac(?:ao|oes)",
+  "requerimento(?:s)?",
+  "protocol(?:ar|o|os|ei|amos|ou|aram|ando)?",
+
+  # voting
+  "voto(?:s)?",
+  "vot(?:ar|ac(?:ao|oes))",
+  "votei",
+  "votamos",
+  "votaram",
+  "votarei"
+)
+
+pattern_programmatic <- paste(keywords_programmatic, collapse = "|")
+#######################################
+#######################################
+
+
+#######################################
+#######################################
+keywords_propagandistic <- c(
+  # attention / urgency
+  "atencao",
+  "urgente",
+  "grave(?:s)?",
+  "gravissim[oa]s?",
+  "bomb(?:a|astica|asticas)",
+  "escandal(?:o|osa)",
+  "absurdo",
+
+  # exposure / revelation / denunciation frames
+  "investig(?:ar|a(?:cao|coes)|o|ou|uei|amos|am|ando)",
+  "irregularidad(?:e|es)",
+  "suspeit[oa]s?",
+  "mentir(?:a|u|am|emos|ei|ou|indo)?",
+  "esquema(?:s)?",
+  "vazamento(?:s)?",
+  "indicio(?:s)?",
+  "prova(?:s)?",
+  "revel(?:ar|a(?:cao|coes)|ei|ou|am|amos|ad[oa]s?)",
+  "revelaram",
+  "exposic(?:ao|oes)",
+  "expost[oa]s?",
+  "expor",
+  "exp(?:o|u)s(?:t[oa]s?)?",
+  "descobr(?:ir|i|iu|indo|imos|iram)",
+  "denunc(?:ia|iar|iei|iou|iam|iamos|as|os)",
+  "denunciad[oa]s?",
+  "apur(?:ar|ou)",
+  "deflagrad[oa]s?",
+  "delat(?:ar|ou)",
+  "demonstr(?:a|am|ou|aram)",
+  "fato(?:s)?",
+
+  # press/media + narrative framing
+  "imprensa",
+  "jornalista(?:s)?",
+  "midia",
+  "revista(?:s)?",
+  "censura",
+  "censurad[oa]s?",
+  "narrativa(?:s)?",
+  "fake\\s+news",
+  "fals[oa]s?",
+  "farsa(?:s)?|farso(?:s|a|as|os)?",
+  "mentir(?:a|u|am|emos|ei|ou|indo)?|mentira(?:s)?|mentiros[oa]s?",
+
+  # “explainer” posture
+  "entenda",
+  "esclarecedor",
+  "explic(?:a|acoes|ativo|ativa|ativos|ativas)",
+  "resumo",
+  "mostra\\s+bem",
+  "tese",
+  "opiniao",
+  "question(?:ar|ou|ei|amos|am|ando)?",
+  "depoimento(?:s)?",
+  "testemunhei",
+  "descobr(?:ir|i|iu|indo|imos|iram)",
+  "desmascar(?:ar|ei|ou|amos|ad[oa]s?)"
+)
+
+pattern_propagandistic <- paste(keywords_propagandistic, collapse = "|")
+```
+
+```{r}
+re_programmatic   <- make_re(keywords_programmatic)
+re_parochial      <- make_re(keywords_parochial)
+re_propagandistic <- make_re(keywords_propagandistic)
+
+df_FB_with_PEC135 <- df_FB_with_PEC135 %>%
+  mutate(
+    programmatic_matches   = count_re(text_combined, re_programmatic),
+    parochial_matches      = count_re(text_combined, re_parochial),
+    propagandistic_matches = count_re(text_combined, re_propagandistic)
+  )
+```
+
+
+
+# Export
+
+```{r}
+# df_FB_clean <- df_FB_with_PEC135 %>%
+#   dplyr::rename(ideology_2021 = `2021_ideological_score`)
+
+df_FB_processed <- df_FB_with_PEC135 %>%
+  dplyr::select(postID, 
+                author,
+                page_name,
+                thread_id,
+                text_combined,
+                timestamp,
+                page_created,
+                page_likes,
+                page_id,
+                page_followers,
+                type,
+                post_format,
+                has_hashtags,
+                engagement,
+                interactions,
+                comments,
+                shares,        
+                likes, 
+                likes_love,  
+                likes_wow,   
+                likes_haha,   
+                likes_sad,   
+                likes_angry,
+                likes_care,
+                views_post,
+                views_total,
+                views_total_crossposts,
+                hashtags,
+                url,
+                url_original,
+                party,
+                state,
+                ideology_2021,
+                PEC135,
+                programmatic_matches,
+                parochial_matches,
+                propagandistic_matches
+                )
+
+# Save as CSV
+readr::write_csv2(
+  df_FB_processed,
+  file.path("_processed_data", "df_FB_processed.csv")
+)
+
+# Save as RDS
+readr::write_rds(
+  df_FB_processed,
+  file.path("_processed_data", "df_FB_processed.rds")
+)
+```
+
+
+
