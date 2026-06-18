@@ -20,6 +20,7 @@ font_add_google("EB Garamond", "EB Garamond")
 showtext_auto()
 ```
 
+
 # Data
 
 ```{r}
