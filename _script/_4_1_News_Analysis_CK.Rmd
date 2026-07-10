@@ -1,0 +1,770 @@
+---
+title: "_wolves_news_analysis_V2"
+author: "CBK"
+date: "2026-06-23"
+output: html_document
+---
+
+install.packages("ggrepel")
+library(ggplot2)
+library(ggrepel)
+library(tidyr)
+library(broom)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+
+# ==============================================================================
+# STEP 1 & 2: Clean the Base Data (Automated + Manual Scrubbing)
+# ==============================================================================
+domain_long_clean <- account_by_media_domain_counts %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "author") %>%
+  pivot_longer(
+    cols = -author, 
+    names_to = "domain", 
+    values_to = "share_count"
+  ) %>%
+  filter(share_count > 0) %>%
+  
+  # 1. Automated filter: Remove exact matches (ignoring case)
+  filter(!tolower(domain) %in% politician_handles) %>%
+  
+  # 2. Manual filter: Catch the mismatched handles and non-media blogs
+  filter(!domain %in% c("lpbraganca", "pedrolupion", "sandersonfederal", "gurgelrj", 
+                        "marcelvanhattem", "franciscojr", "deputadohugoleal", "evairdemelo", 
+                        "charliesevangelista", "christinoaureo", "jaquelinecassol", 
+                        "osiresdamaso", "renataabreuoficial", "domingossavio", "leandre", 
+                        "joaoroma", "nereucrispim", "prb10", "agriculturarsgovbr",
+                        "portaltanosite", "blogdomarcosjunior", "gdia"))
+
+# ==============================================================================
+# Re-run the rest of the pipeline to generate the plot
+# ==============================================================================
+right_shares_clean <- domain_long_clean %>%
+  inner_join(right_nodes %>% select(author, is_wolf), by = "author")
+
+domain_signatures_clean <- right_shares_clean %>%
+  group_by(is_wolf, domain) %>%
+  summarise(shares = sum(share_count, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = is_wolf, values_from = shares, values_fill = 0, names_prefix = "wolf_") %>%
+  rename(non_wolf_shares = wolf_0, wolf_shares = wolf_1) %>%
+  mutate(
+    total_non_wolf = sum(non_wolf_shares),
+    total_wolf = sum(wolf_shares),
+    rate_non_wolf = (non_wolf_shares + 1) / (total_non_wolf + 1),
+    rate_wolf = (wolf_shares + 1) / (total_wolf + 1),
+    log_odds_ratio = log(rate_wolf / rate_non_wolf),
+    total_shares = wolf_shares + non_wolf_shares
+  ) %>%
+  filter(total_shares >= 20)
+
+top_distinctive_clean <- domain_signatures_clean %>%
+  group_by(log_odds_ratio > 0) %>%
+  slice_max(abs(log_odds_ratio), n = 15) %>%
+  ungroup() %>%
+  mutate(
+    faction = ifelse(log_odds_ratio > 0, "Distinctly Wolf", "Distinctly Non-Wolf"),
+    domain = fct_reorder(domain, log_odds_ratio)
+  )
+
+ggplot(top_distinctive_clean, aes(x = log_odds_ratio, y = domain, fill = faction)) +
+  geom_col(alpha = 0.8) +
+  geom_text(aes(label = paste0(wolf_shares, " / ", non_wolf_shares), hjust = ifelse(log_odds_ratio > 0, -0.1, 1.1)), size = 3) +
+  scale_fill_manual(values = c("Distinctly Wolf" = "darkred", "Distinctly Non-Wolf" = "steelblue")) +
+  expand_limits(x = c(min(top_distinctive_clean$log_odds_ratio) * 1.3, max(top_distinctive_clean$log_odds_ratio) * 1.3)) +
+  labs(
+    title = "Differential Media Signatures: Wolves vs. Non-Wolves (Cleaned)",
+    subtitle = "Excludes intra-parliamentary retweets/shares. Labels = Absolute Shares.",
+    x = "Log Odds Ratio (< 0: Non-Wolf | > 0: Wolf)",
+    y = NULL,
+    fill = "Faction Signature"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"), legend.position = "bottom", panel.grid.major.y = element_blank())
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+# ==============================================================================
+# STEP 1: Calculate Total Media Output (The Denominators)
+# ==============================================================================
+group_budgets <- right_shares_clean %>%
+  group_by(is_wolf) %>%
+  summarise(total_faction_shares = sum(share_count), .groups = "drop")
+
+total_w_shares <- group_budgets %>% filter(is_wolf == 1) %>% pull(total_faction_shares)
+total_nw_shares <- group_budgets %>% filter(is_wolf == 0) %>% pull(total_faction_shares)
+
+# ==============================================================================
+# STEP 2: Compute Attention Share per Domain
+# ==============================================================================
+media_diet_shares <- right_shares_clean %>%
+  group_by(is_wolf, domain) %>%
+  summarise(domain_faction_shares = sum(share_count), .groups = "drop") %>%
+  pivot_wider(
+    names_from = is_wolf, 
+    values_from = domain_faction_shares, 
+    values_fill = 0, 
+    names_prefix = "shares_"
+  ) %>%
+  rename(nw_shares = shares_0, w_shares = shares_1) %>%
+  mutate(
+    # What % of their total media diet does each group give to this domain?
+    pct_of_wolf_diet = (w_shares / total_w_shares) * 100,
+    pct_of_nonwolf_diet = (nw_shares / total_nw_shares) * 100,
+    
+    total_volume = w_shares + nw_shares,
+    
+    # Calculate an asymmetric ratio for labeling decisions
+    diet_ratio = (pct_of_wolf_diet + 0.001) / (pct_of_nonwolf_diet + 0.001)
+  ) %>%
+  # Keep domains with a minimum baseline of overall shares to avoid tiny noise
+  filter(total_volume >= 20)
+
+# ==============================================================================
+# STEP 3: Plot the Media Diet Space
+# ==============================================================================
+ggplot(media_diet_shares, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) +
+  
+  # 45-degree identity line: Domains on this line get EQUAL attention from both groups
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  
+  # Plot domains as points, sized by their total volume
+  geom_point(aes(size = total_volume), color = "purple4", alpha = 0.6) +
+  
+  # Log scales are necessary because a few domains (like globo/exame) take massive chunks of the diet
+  scale_x_log10(labels = function(x) paste0(x, "%")) +
+  scale_y_log10(labels = function(x) paste0(x, "%")) +
+  
+  # Label the most distinct outliers on both sides
+  geom_text_repel(
+    data = media_diet_shares %>% filter(diet_ratio > 3.5 | diet_ratio < 0.25 | total_volume > 2000),
+    aes(label = domain),
+    size = 3.5,
+    box.padding = 0.4,
+    max.overlaps = 20
+  ) +
+  
+  labs(
+    title = "The Right-Wing Media Diet Space",
+    subtitle = "Compares the percentage of each faction's total link budget dedicated to a given domain.",
+    x = "Share of Non-Wolf Media Diet (Log Scale)",
+    y = "Share of Wolf Media Diet (Log Scale)",
+    size = "Total Combined Shares"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+# ==============================================================================
+# STEP 1: Calculate Diet Attention Shares
+# ==============================================================================
+group_budgets <- right_shares_clean %>%
+  group_by(is_wolf) %>%
+  summarise(total_faction_shares = sum(share_count), .groups = "drop")
+
+total_w_shares <- group_budgets %>% filter(is_wolf == 1) %>% pull(total_faction_shares)
+total_nw_shares <- group_budgets %>% filter(is_wolf == 0) %>% pull(total_faction_shares)
+
+media_diet_base <- right_shares_clean %>%
+  group_by(is_wolf, domain) %>%
+  summarise(domain_faction_shares = sum(share_count), .groups = "drop") %>%
+  pivot_wider(names_from = is_wolf, values_from = domain_faction_shares, values_fill = 0, names_prefix = "shares_") %>%
+  rename(nw_shares = shares_0, w_shares = shares_1) %>%
+  mutate(
+    pct_of_wolf_diet = (w_shares / total_w_shares) * 100,
+    pct_of_nonwolf_diet = (nw_shares / total_nw_shares) * 100,
+    total_volume = w_shares + nw_shares,
+    diet_ratio = (pct_of_wolf_diet + 0.001) / (pct_of_nonwolf_diet + 0.001)
+  ) %>%
+  filter(total_volume >= 20)
+
+# ==============================================================================
+# STEP 2: Inject Domain-Level Ideology and Exclusivity Metadata (CORRECTED)
+# ==============================================================================
+media_diet_enriched <- media_diet_base %>%
+  left_join(
+    domain_ideology_summary %>% 
+      select(domain, weighted_mean_ideology, weighted_sd_ideology),
+    by = "domain"
+  )
+
+# ==============================================================================
+# STEP 3: Plot with Ideological/Exclusivity Color Coding
+# ==============================================================================
+ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) +
+  
+  # 45-degree identity line (Equal attention)
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray60") +
+  
+  # Color points by domain ideology (Blue = Left/Center, Red = Right)
+  # Alpha (transparency) is linked to Exclusivity: Lower SD = Higher Exclusivity = More Opaque
+  geom_point(aes(color = weighted_mean_ideology, size = total_volume, alpha = 1 - weighted_sd_ideology)) +
+  
+  # Log scales to handle the massive distribution gap
+  scale_x_log10(labels = function(x) paste0(x, "%")) +
+  scale_y_log10(labels = function(x) paste0(x, "%")) +
+  
+  # Continuous color scale centered at 0 (neutral/center baseline)
+  scale_color_gradient2(
+    low = "steelblue", 
+    mid = "gray90", 
+    high = "darkred", 
+    midpoint = 0,
+    name = "Domain Ideology\nScore"
+  ) +
+  
+  # Guide for visibility adjustments
+  scale_alpha_continuous(name = "Domain Exclusivity\n(1 - SD)", range = c(0.4, 1)) +
+  scale_size_continuous(name = "Total Combined Shares", labels = scales::comma) +
+  
+  # Label the critical diagnostic anchors
+  geom_text_repel(
+    data = media_diet_enriched %>% filter(diet_ratio > 3.5 | diet_ratio < 0.25 | total_volume > 2000),
+    aes(label = domain),
+    size = 3.5,
+    box.padding = 0.4,
+    max.overlaps = 25
+  ) +
+  
+  labs(
+    title = "The Ideological Geography of the Right-Wing Media Diet",
+    subtitle = "Color maps the underlying domain ideology; transparency highlights echo-chamber exclusivity.",
+    x = "Share of Non-Wolf Media Diet (Log Scale)",
+    y = "Share of Wolf Media Diet (Log Scale)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+```
+
+
+
+```{r domain ideology}
+# 1. Convert the wide matrix into a long dataframe
+domain_long <- account_by_media_domain_counts %>%
+  as.data.frame() %>%
+  # Move the row names (the account handles) into a proper column
+  rownames_to_column(var = "author") %>%
+  # Pivot all domain columns into two columns: 'domain' and 'share_count'
+  pivot_longer(
+    cols = -author, 
+    names_to = "domain", 
+    values_to = "share_count"
+  ) %>%
+  # Filter out the zeroes immediately to save memory and processing time
+  filter(share_count > 0)
+
+# 2. Merge with legislator data and calculate ideological metrics
+domain_ideology_summary <- domain_long %>%
+  # Join only the necessary columns from nodes_breakdown
+  inner_join(
+    nodes_breakdown %>% select(author, party, ideology_2021), 
+    by = "author"
+  ) %>%
+  group_by(domain) %>%
+  summarise(
+    total_shares = sum(share_count, na.rm = TRUE),
+    
+    # Weighted Mean
+    weighted_mean_ideology = sum(share_count * ideology_2021, na.rm = TRUE) / total_shares,
+    
+    # Weighted Variance and Standard Deviation
+    weighted_variance = sum(share_count * (ideology_2021 - weighted_mean_ideology)^2, na.rm = TRUE) / total_shares,
+    weighted_sd_ideology = sqrt(weighted_variance),
+    
+    .groups = "drop"
+  ) %>%
+  # Filter out low-frequency domains to avoid artificial 0 standard deviations
+  filter(total_shares >= 10) %>%
+  # Sort by total shares descending for readability
+  arrange(desc(total_shares))
+```
+
+
+```{r domain compass, echo=FALSE}
+ggplot(domain_ideology_summary, aes(x = weighted_mean_ideology, y = total_shares)) +
+  
+  # 1. Plot the points. Color maps to the standard deviation (exclusivity)
+  geom_point(aes(color = weighted_sd_ideology), alpha = 0.7, size = 2.5) +
+  
+  # 2. Use a log10 scale for the Y-axis to handle power-law frequency distributions
+  scale_y_log10(labels = scales::comma) +
+  
+  # 3. Add a vertical line at 0 to denote the ideological center
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  
+  # 4. Label only the top 5% most shared domains to prevent unreadable text overlap
+  geom_text_repel(
+    data = subset(domain_ideology_summary, total_shares > quantile(total_shares, 0.95)),
+    aes(label = domain),
+    size = 3.5,
+    box.padding = 0.5,
+    max.overlaps = 20
+  ) +
+  
+  # 5. Define a clean color gradient for the standard deviation
+  scale_color_viridis_c(
+    option = "plasma", 
+    name = "Ideological Dispersion (SD)\nLow = Exclusive/Echo Chamber\nHigh = Cross-Partisan"
+  ) +
+  
+  # 6. Labels and theme
+  labs(
+    title = "Media Domain Mapping: Ideology, Frequency, and Dispersion",
+    x = "Ideological Center of Gravity (Left < 0 > Right)",
+    y = "Total Shares (Log10 Scale)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "right",
+    panel.grid.minor = element_blank()
+  )
+```
+
+```{r}
+# 1. Filter out low-N noise to prevent false variance signals
+filtered_summary <- domain_ideology_summary %>%
+  filter(total_shares >= 50)
+
+# 2. Isolate exactly the top 25 most shared domains for clean labeling
+top_domains <- filtered_summary %>%
+  slice_max(order_by = total_shares, n = 500)
+
+# 3. Generate the revised plot
+ggplot(filtered_summary, aes(x = weighted_mean_ideology, y = total_shares)) +
+  
+  # Add slight horizontal jitter to expose density and mitigate the "pillar" artifact
+  geom_jitter(
+    aes(color = weighted_sd_ideology), 
+    width = 0.03, height = 0, 
+    alpha = 0.8, size = 2.5
+  ) +
+  
+  scale_y_log10(labels = scales::comma) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  
+  # Apply labels only to the isolated top 25 dataframe
+  geom_text_repel(
+    data = top_domains,
+    aes(label = domain),
+    size = 3.5,
+    box.padding = 0.8,
+    point.padding = 0.3,
+    max.overlaps = Inf, # Forces all 25 labels to render
+    seed = 42           # Ensures reproducible label placement
+  ) +
+  
+  scale_color_viridis_c(
+    option = "plasma", 
+    name = "Ideological Dispersion (SD)\nLow = Exclusive\nHigh = Cross-Partisan"
+  ) +
+  
+  labs(
+    title = "Media Domain Mapping: Ideology, Frequency, and Dispersion",
+    subtitle = "Filtered for domains with ≥ 50 shares;labeled",
+    x = "Ideological Center of Gravity (Left < 0 > Right)",
+    y = "Total Shares (Log10 Scale)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(color = "gray30", margin = margin(b = 10)),
+    legend.position = "right",
+    panel.grid.minor = element_blank()
+  )
+```
+
+```{r}
+# ==============================================================================
+# STEP 1: Baseline Ideology Check (Wolves vs. Rest)
+# ==============================================================================
+cat("--- T-Test: Baseline Ideology of Wolves vs Non-Wolves ---\n")
+ideology_ttest <- t.test(ideology_2021 ~ is_wolf, data = nodes_breakdown)
+print(ideology_ttest)
+
+# ==============================================================================
+# STEP 2: Classify Domains
+# ==============================================================================
+# Determine the 75th percentile of standard deviation to define "Universal"
+sd_threshold <- quantile(domain_ideology_summary$weighted_sd_ideology, 0.75, na.rm = TRUE)
+
+classified_domains <- domain_ideology_summary %>%
+  mutate(
+    domain_category = case_when(
+      weighted_sd_ideology >= sd_threshold ~ "Universal",
+      weighted_mean_ideology <= -0.5 ~ "Far-Left",
+      weighted_mean_ideology > -0.5 & weighted_mean_ideology <= -0.1 ~ "Left",
+      weighted_mean_ideology > -0.1 & weighted_mean_ideology < 0.1 ~ "Center",
+      weighted_mean_ideology >= 0.1 & weighted_mean_ideology < 0.5 ~ "Right",
+      weighted_mean_ideology >= 0.5 ~ "Far-Right",
+      TRUE ~ "Unclassified" # Catch-all for safety
+    )
+  )
+
+# ==============================================================================
+# STEP 3: Calculate Author-Level Proportions
+# ==============================================================================
+author_domain_stats <- domain_long %>%
+  # Join the classified domains back to the raw sharing data
+  inner_join(classified_domains %>% select(domain, domain_category), by = "domain") %>%
+  
+  # Calculate total shares and categorical shares per author
+  group_by(author) %>%
+  mutate(total_author_shares = sum(share_count, na.rm = TRUE)) %>%
+  group_by(author, domain_category, total_author_shares) %>%
+  summarise(category_shares = sum(share_count, na.rm = TRUE), .groups = "drop") %>%
+  
+  # Pivot wider to get columns for each category's proportion
+  pivot_wider(
+    names_from = domain_category, 
+    values_from = category_shares, 
+    values_fill = 0
+  ) %>%
+  
+  # Calculate the proportion of shares that are Far-Right
+  # (Modify this line if you want to test other categories)
+  mutate(
+    prop_far_right = `Far-Right` / total_author_shares
+  ) %>%
+  
+  # Join back to nodes_breakdown to get the 'is_wolf' and 'ideology_2021' variables
+  inner_join(nodes_breakdown %>% select(author, is_wolf, ideology_2021), by = "author")
+
+# ==============================================================================
+# STEP 4: Statistical Test (Regression)
+# ==============================================================================
+# We use OLS regression to test the 'wolf' effect while CONTROLLING for baseline ideology.
+# Dependent Variable: Proportion of an author's shares that go to Far-Right domains.
+
+cat("\n--- OLS Regression: Predicting Far-Right Domain Sharing ---\n")
+model_far_right <- lm(prop_far_right ~ is_wolf + ideology_2021, data = author_domain_stats)
+summary(model_far_right)
+```
+
+
+```{r}
+# ==============================================================================
+# STEP 1: Isolate the Right-Wing Parliamentarians
+# ==============================================================================
+# Filter for legislators with an ideology score > 0
+right_nodes <- nodes_breakdown %>% 
+  filter(ideology_2021 > 0)
+
+# Join their sharing behavior with the previously calculated domain metrics
+right_shares <- domain_long %>%
+  inner_join(right_nodes %>% select(author, is_wolf, ideology_2021), by = "author") %>%
+  inner_join(domain_ideology_summary, by = "domain")
+
+# ==============================================================================
+# STEP 2: Extract the Top 20 Domains (Wolves vs. Non-Wolves)
+# ==============================================================================
+cat("--- Top 20 Domains Shared by Right-Wing WOLVES ---\n")
+top_wolf_domains <- right_shares %>%
+  filter(is_wolf == 1) %>%
+  group_by(domain) %>%
+  summarise(
+    total_wolf_shares = sum(share_count),
+    domain_mean_ideology = first(weighted_mean_ideology),
+    domain_exclusivity_sd = first(weighted_sd_ideology),
+    .groups = "drop"
+  ) %>%
+  slice_max(order_by = total_wolf_shares, n = 20)
+print(top_wolf_domains)
+
+cat("\n--- Top 20 Domains Shared by Right-Wing NON-WOLVES ---\n")
+top_nonwolf_domains <- right_shares %>%
+  filter(is_wolf == 0) %>%
+  group_by(domain) %>%
+  summarise(
+    total_nonwolf_shares = sum(share_count),
+    domain_mean_ideology = first(weighted_mean_ideology),
+    domain_exclusivity_sd = first(weighted_sd_ideology),
+    .groups = "drop"
+  ) %>%
+  slice_max(order_by = total_nonwolf_shares, n = 20)
+print(top_nonwolf_domains)
+
+# ==============================================================================
+# STEP 3: Aggregate Author-Level Metrics for Statistical Testing
+# ==============================================================================
+author_right_stats <- right_shares %>%
+  group_by(author, is_wolf, ideology_2021) %>%
+  summarise(
+    total_author_shares = sum(share_count),
+    
+    # Calculate the average extremity and exclusivity of the domains this author shares,
+    # weighted by how often they share them.
+    author_avg_domain_extremity = sum(share_count * weighted_mean_ideology) / total_author_shares,
+    author_avg_domain_exclusivity = sum(share_count * weighted_sd_ideology) / total_author_shares,
+    .groups = "drop"
+  )
+
+# ==============================================================================
+# STEP 4: Hypothesis Testing
+# ==============================================================================
+
+cat("\n--- Test 1: Do Right-Wing Wolves Share a Higher VOLUME of Links? ---\n")
+# Using a regression to control for baseline ideology
+vol_model <- lm(total_author_shares ~ is_wolf + ideology_2021, data = author_right_stats)
+print(summary(vol_model))
+
+cat("\n--- Test 2: Do Right-Wing Wolves Share More EXTREME (Further Right) Domains? ---\n")
+extremity_model <- lm(author_avg_domain_extremity ~ is_wolf + ideology_2021, data = author_right_stats)
+print(summary(extremity_model))
+
+cat("\n--- Test 3: Do Right-Wing Wolves Share More EXCLUSIVE (Lower SD) Domains? ---\n")
+# Note: A negative coefficient for is_wolf here means they share MORE exclusive domains
+exclusivity_model <- lm(author_avg_domain_exclusivity ~ is_wolf + ideology_2021, data = author_right_stats)
+print(summary(exclusivity_model))
+```
+
+```{r}
+
+# ==============================================================================
+# STEP 1: Define the "Hyper-Partisan Right" Echo Chambers
+# Thresholds: highly exclusive (SD < 0.15) AND explicitly right-wing (Mean > 0.3)
+# This perfectly captures domains like plenonews, mblnews, revistaoeste, etc.
+# ==============================================================================
+hyper_partisan_domains <- domain_ideology_summary %>%
+  mutate(
+    is_hyper_partisan_right = if_else(
+      weighted_sd_ideology < 0.15 & weighted_mean_ideology > 0.3, 
+      1, 
+      0
+    )
+  ) %>%
+  select(domain, is_hyper_partisan_right)
+
+# ==============================================================================
+# STEP 2: Calculate the "Alternative Share" per Right-Wing Author
+# We calculate the ratio of hyper-partisan shares to total shares, isolating 
+# the concentration of their echo-chamber footprint.
+# ==============================================================================
+author_alt_media_stats <- right_shares %>%
+  # Join the hyper-partisan classification to the right-wing sharing data
+  left_join(hyper_partisan_domains, by = "domain") %>%
+  
+  # Group by author and their attributes to calculate the required metrics
+  group_by(author, is_wolf, ideology_2021) %>%
+  summarise(
+    total_shares = sum(share_count, na.rm = TRUE),
+    hyper_partisan_shares = sum(share_count * is_hyper_partisan_right, na.rm = TRUE),
+    
+    # Calculate the dependent variable: Proportion of media diet that is hyper-partisan
+    prop_hyper_partisan = hyper_partisan_shares / total_shares,
+    .groups = "drop"
+  )
+
+# ==============================================================================
+# STEP 3: The Crucial Statistical Test (Within-Group Comparison)
+# Does being a "wolf" predict a higher concentration of hyper-partisan media, 
+# holding constant their baseline conservative ideology?
+# ==============================================================================
+cat("--- OLS Regression: Predicting Hyper-Partisan Media Concentration (Right-Wing Only) ---\n")
+alt_media_model <- lm(prop_hyper_partisan ~ is_wolf + ideology_2021, data = author_alt_media_stats)
+print(summary(alt_media_model))
+
+# Optional: View the top authors with the highest concentration of hyper-partisan domains
+cat("\n--- Top 10 Right-Wing Authors by Hyper-Partisan Share ---\n")
+author_alt_media_stats %>%
+  arrange(desc(prop_hyper_partisan)) %>%
+  select(author, is_wolf, prop_hyper_partisan, total_shares) %>%
+  head(10) %>%
+  print()
+```
+
+
+
+```{r}
+
+# ==============================================================================
+# STEP 1: Define the Competing Media Factions
+# ==============================================================================
+# We define the two flagship clusters based on the descriptive Top 20 lists
+wolf_flagships <- c("plenonews", "revistaoeste", "conexaopolitica", "renovamidia", "gazetabrasil")
+nonwolf_flagships <- c("mblnews") # Kim Kataguiri's primary vehicle
+
+# ==============================================================================
+# STEP 2: Calculate Factional Loyalty per Author
+# ==============================================================================
+intra_right_split <- right_shares %>%
+  group_by(author, is_wolf) %>%
+  summarise(
+    total_wolf_media = sum(share_count[domain %in% wolf_flagships], na.rm = TRUE),
+    total_mbl_media = sum(share_count[domain %in% nonwolf_flagships], na.rm = TRUE),
+    total_overall_shares = sum(share_count, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  # Filter out legislators who don't engage in either alternative ecosystem 
+  # (to focus specifically on those consuming hyper-partisan media)
+  filter(total_wolf_media > 0 | total_mbl_media > 0) %>%
+  
+  # Calculate normalized proportions to see their "diet composition"
+  mutate(
+    prop_wolf_media = total_wolf_media / (total_wolf_media + total_mbl_media),
+    wolf_status = ifelse(is_wolf == 1, "Wolf (Bolsonarista)", "Non-Wolf (Institutional/MBL)")
+  )
+
+# ==============================================================================
+# STEP 3: Statistical Check (Correlation of Factional Media)
+# ==============================================================================
+cat("--- Pearson Correlation: Sharing Wolf Media vs. Sharing MBL Media ---\n")
+# If the right is fractured, this correlation will be near zero or negative.
+cor_test <- cor.test(intra_right_split$total_wolf_media, intra_right_split$total_mbl_media)
+print(cor_test)
+
+# ==============================================================================
+# STEP 4: The Visualization (The Bimodal Scatter Plot)
+# ==============================================================================
+ggplot(intra_right_split, aes(x = total_mbl_media, y = total_wolf_media)) +
+  
+  # Plot points, sized by overall share volume, colored by actual Wolf classification
+  geom_point(aes(color = wolf_status, size = total_overall_shares), alpha = 0.7) +
+  
+  # Log10 scales are critical here because Kataguiri's volume will compress the rest of the graph
+  scale_x_log10(labels = scales::comma) +
+  scale_y_log10(labels = scales::comma) +
+  
+  # Add labels for the most extreme outliers (like Kim Kataguiri and top wolves)
+  geom_text_repel(
+    data = intra_right_split %>% filter(total_wolf_media > 100 | total_mbl_media > 100),
+    aes(label = author),
+    size = 3.5,
+    box.padding = 0.5,
+    max.overlaps = 15
+  ) +
+  
+  # Aesthetic styling
+  scale_color_manual(values = c("Wolf (Bolsonarista)" = "darkred", "Non-Wolf (Institutional/MBL)" = "steelblue")) +
+  labs(
+    title = "The Fractured Right: Competing Alternative Media Ecosystems",
+    subtitle = "Authors align almost exclusively with either MBL News or the Bolsonarista cluster",
+    x = "Total Shares of MBL News (Log10)",
+    y = "Total Shares of Wolf Ecosystem Domains (Log10)",
+    color = "Legislator Classification",
+    size = "Total Output (All Domains)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+
+# ==============================================================================
+# STEP 1: Calculate Group-Level Shares
+# (You can use 'domain_long' to compare against the entire parliament, 
+# or 'right_shares' to compare strictly within the right. Using right_shares here.)
+# ==============================================================================
+group_shares <- right_shares %>%
+  group_by(is_wolf, domain) %>%
+  summarise(shares = sum(share_count, na.rm = TRUE), .groups = "drop")
+
+# ==============================================================================
+# STEP 2: Calculate Log Odds Ratio for Every Domain
+# ==============================================================================
+domain_signatures <- group_shares %>%
+  pivot_wider(
+    names_from = is_wolf, 
+    values_from = shares, 
+    values_fill = 0, 
+    names_prefix = "wolf_"
+  ) %>%
+  rename(non_wolf_shares = wolf_0, wolf_shares = wolf_1) %>%
+  mutate(
+    # Total shares per group across all domains
+    total_non_wolf = sum(non_wolf_shares),
+    total_wolf = sum(wolf_shares),
+    
+    # Calculate rates with +1 pseudo-count (Laplace smoothing)
+    rate_non_wolf = (non_wolf_shares + 1) / (total_non_wolf + 1),
+    rate_wolf = (wolf_shares + 1) / (total_wolf + 1),
+    
+    # Calculate Log Odds Ratio
+    log_odds_ratio = log(rate_wolf / rate_non_wolf),
+    
+    # Total volume for filtering
+    total_shares = wolf_shares + non_wolf_shares
+  ) %>%
+  # Filter out low-N noise (e.g., a domain shared twice by a wolf shouldn't be deemed "highly distinctive")
+  filter(total_shares >= 20)
+
+# ==============================================================================
+# STEP 3: Extract the Most Distinctive Domains for Both Factions
+# ==============================================================================
+top_distinctive <- domain_signatures %>%
+  group_by(log_odds_ratio > 0) %>%
+  slice_max(abs(log_odds_ratio), n = 15) %>%
+  ungroup() %>%
+  mutate(
+    # Assign a label for the plot
+    faction = ifelse(log_odds_ratio > 0, "Distinctly Wolf", "Distinctly Non-Wolf"),
+    # Order domains by their log odds ratio for clean plotting
+    domain = fct_reorder(domain, log_odds_ratio)
+  )
+
+# ==============================================================================
+# STEP 4: Visualize the Differential Signatures
+# ==============================================================================
+ggplot(top_distinctive, aes(x = log_odds_ratio, y = domain, fill = faction)) +
+  geom_col(alpha = 0.8) +
+  
+  # Add text showing the actual share counts (Wolf / Non-Wolf)
+  geom_text(
+    aes(
+      label = paste0(wolf_shares, " / ", non_wolf_shares),
+      hjust = ifelse(log_odds_ratio > 0, -0.1, 1.1)
+    ),
+    size = 3
+  ) +
+  
+  scale_fill_manual(values = c("Distinctly Wolf" = "darkred", "Distinctly Non-Wolf" = "steelblue")) +
+  
+  # Expand X limits slightly to ensure the text labels aren't cut off
+  expand_limits(x = c(min(top_distinctive$log_odds_ratio) * 1.2, max(top_distinctive$log_odds_ratio) * 1.2)) +
+  
+  labs(
+    title = "Differential Media Signatures: Wolves vs. Non-Wolves",
+    subtitle = "Log Odds Ratio of domain sharing. Labels show absolute shares (Wolf / Non-Wolf).",
+    x = "Log Odds Ratio (< 0: Non-Wolf | > 0: Wolf)",
+    y = NULL,
+    fill = "Faction Signature"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.major.y = element_blank()
+  )
+```
+

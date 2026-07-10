@@ -26,22 +26,22 @@ showtext_auto()
 ```{r}
 # Entire dataset
 df_fb <- read_rds(
-  here("..", "_processed_data", "df_fb_GPT.rds"))
+  here("_processed_data", "df_fb_GPT.rds"))
 # Filtered dataset + GPT analysis
 df_fb_election <- read_rds(
-  here("..", "_processed_data", "df_fb_election.rds"))
+  here("_processed_data", "df_fb_election.rds"))
 
 # Information about politicians
 nodes_breakdown <- read_csv(
-  here("..", "_processed_data", "nodes_breakdown.csv"))
+  here("_processed_data", "nodes_breakdown.csv"))
 
 # Party/Ideology Data
 parties_ideology_scores <- read_csv(
-  here("..", "_data", "parties_ideology_scores.csv"))
+  here("_data", "parties_ideology_scores.csv"))
 
 # Domain data
 account_by_media_domain_counts <- read_rds(
-  here("..", "_processed_data", "account_by_media_domain_counts.rds"))
+  here("_processed_data", "account_by_media_domain_counts.rds"))
 ```
 *Handling missing values*
 ```{r}
