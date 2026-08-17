@@ -238,19 +238,15 @@ municipality_terms <- jsonlite::fromJSON(
 # Includes Brazilian states, state abbreviations, demonyms, regional terms,
 # and geographic hashtag variants identified during inspection.
 
-geographic_terms <- c(
-  "ac", "acre", "acreana", "acreano", "afederaldemt", "al", "alagoana", "alagoano", "alagoas", "am", "amapa", "amapaense", "amazona", "amazonas", "amazonense", "amorporroraima", "ap", "ba", "bahia", "baiana", "baiano", "belohorizonte", "boavista", "boraparaiba", "brasil", "brasileira", "brasileiras", "brasileiro", "brasileiros", "brasiliense", "brasilur", "camposgerais", "camposs", "capital", "capitais", "capixaba", "catarina", "catarinense", "ce", "ceara", "cearense", "cearenses", "centro oeste", "centrooeste", "chuvasmg", "cidadaniapr", "compromissocomoparana", "df", "distrito federal", "distritofederal", "errejota", "es", "espirito santo", "espiritosanto", "estadodabahia", "estadodaparaiba", "estadodeacre",
-  "estadodealagoas", "estadodegoias", "estadodemato grosso", "estadodematogrosso", "estadodematogrossodosul", "estadodemg", "estadodemina", "estadodeminas", "estadodeminasgerais", "estadodepernambuco", "estadoderondonia", "estadoderoraima", "estadoders", "estadodesantacatarina", "estadodesaopaulo", "estadodesc", "estadodesergipe", "estadodesp", "estadodetocantins", "estadodoacre", "estadodoamapa", "estadodoamazonas",
-  "estadodoceara", "estadododistritofederal", "estadodoespiritosanto", "estadodomaranhao", "estadodopara", "estadodoparana", "estadodopiaui", "estadodoriodejaneiro", "estadodoriograndedosul", "estadodorn", "federalrj", "fluminense", "frentepopulardorecife", "gaucha", "gaucho", "go", "goia", "goiana", "goiano", "goias", "governodabahia", "governodoceara", "governorj", "ibiritimig", "ibiritemg", "interiorsp", "ma", "maranhao", "maranhense", "maranhenses", "maranhaozinho", "matogrosso", "matogrossodosul", "mato grosso",
-  "mato grosso do sul", "mg", "miguelcoelhope", "minas", "minas gerais", "minasgerais", "minasgeral", "mineira", "mineiro", "ms", "mt", "mudapiaui", "nordeste", "nordestina", "nordestino", "norte", "novaiguacu", "pa", "para", "paraense", "paraiba", "paraibana", "paraibano", "parana", "paranaense", "paulista", "pb", "pe", "pelabahia", "pelomaranhao", "peloparana", "peloparano", "pelopiaui", "pernambuco", "pernambucana", "pernambucano", "pernambucoemfoco", "pi", "piaui", "piauiense", "pontagrossa", "porminas", "porsergipe", "potiguar", "pr", "prafrentesp", "psbma", "psolpa", "ptbahia", "rj", "rio", "rio de janeiro", "rio grande do norte", "rio grande do sul", "riodejaneiro", "riograndedonorte", "riograndedosul", "rn", "ro", "rondonia", "rondoniense", "roraima", "roraimense", "rr", "rs", "santa catarina", "santacatarina", "santacatarino", "sao paulo", "saopaulo", "spaulo", "saudegoias", "saudemg", "sc", "se", "sergipe", "sergipana", "sergipano", "sp", "sudeste", "sudoestegoiano", "sul", "sulmatogrossense", "sulmatogrossenses", "tocantins", "tocantinense", "to", "todosporminas", "trabalhandoporgoias", "trabalhandoporpernambuco", "trabalhandoporsergipe", "trabalhandoporsp", "trabalhopelaparaiba", "votuporangasp", "riobonito", "saogoncalo", "bancadacapixaba", "saopedrodaaldeia", "riodasostras", "arraialdocabo", "duasbarras", "camposdosgoytacazes")
+geographic_terms <- c("ac", "acre", "acreana", "acreano", "afederaldemt", "al", "alagoana", "alagoano", "alagoas", "am", "amapa", "amapaense", "amazona", "amazonas", "amazonense", "amorporroraima", "ap", "araguaia", "arraialdocabo",
+  "ba", "bahia", "baiana", "baiano", "bancadacapixaba", "belohorizonte", "boavista", "boraparaiba", "brasil", "brasileira", "brasileiras", "brasileiro", "brasileiros", "brasiliense", "brasilur", "camposdosgoytacazes", "camposgerais", "camposs", "capital", "capitais", "capixaba", "catarina", "catarinense", "ce", "ceara", "cearense", "cearenses", "centro oeste", "centrooeste", "chuvasmg", "cidadaniapr", "compromissocomoparana", "df", "distrito federal", "distritofederal", "duasbarras", "errejota", "es", "espirito santo", "espiritosanto", "estadodabahia", "estadodaparaiba", "estadodeacre", "estadodealagoas", "estadodegoias", "estadodemato grosso", "estadodematogrosso", "estadodematogrossodosul", "estadodemg", "estadodemina", "estadodeminas", "estadodeminasgerais", "estadodepernambuco", "estadoderondonia", "estadoderoraima", "estadoders", "estadodesantacatarina", "estadodesaopaulo", "estadodesc", "estadodesergipe", "estadodesp", "estadodetocantins", "estadodoacre", "estadodoamapa", "estadodoamazonas", "estadodoceara", "estadododistritofederal", "estadodoespiritosanto", "estadodomaranhao", "estadodopara", "estadodoparana", "estadodopiaui", "estadodoriodejaneiro", "estadodoriograndedosul", "estadodorn", "federalrj", "fluminense", "frentepopulardorecife", "gaucha", "gaucho", "go", "goia", "goiana", "goiano", "goias", "governodabahia", "governodoceara", "governorj", "governosp", "grosso", "ibiritemg", "ibiritimig", "interiorsp", "jaraguadosul", "ma", "maranhao", "maranhense", "maranhenses", "maranhaozinho", "mato", "mato grosso", "mato grosso do sul", "matogrossense", "matogrosso", "matogrossodosul", "mg", "miguelcoelhope", "minas", "minas gerais", "minasgeral", "minasgerais", "mineira", "mineiro", "ms", "mt", "mudapiaui", "nordeste", "nordestina", "nordestino", "noroeste", "norte", "novaiguacu", "oeste", "pa", "para", "paraense", "paraiba", "paraibana", "paraibano", "parambuense", "parana", "paranaense", "paulista", "pb", "pe", "pelabahia", "pelomaranhao", "peloparana", "peloparano", "pelopiaui", "pernambuco", "pernambucana", "pernambucano", "pernambucoemfoco", "pi", "piaui", "piauiense", "pontagrossa", "porminas", "porsergipe", "potiguar", "pr", "prafrentesp", "psbma", "psolpa", "ptbahia", "riobonito", "rio", "rio de janeiro", "rio grande do norte", "rio grande do sul", "riodasostras", "riodejaneiro", "riograndedonorte", "riograndedosul", "rj", "rn", "ro", "rondonia", "rondoniense", "roraima", "roraimense", "rr", "rs", "santa catarina", "santacatarina", "santacatarino", "sao paulo", "saogoncalo", "saopaulo", "saopedrodaaldeia", "saudegoias", "saudemg", "sc", "se", "sergipana", "sergipano", "sergipe", "sorocabano", "sp", "spaulo", "sudeste", "sudoeste", "sudoestegoiano", "sul", "sulmatogrossense", "sulmatogrossenses", "to", "tocantinense", "tocantins", "todosporminas", "trabalhandoporgoias", "trabalhandoporpernambuco", "trabalhandoporsergipe", "trabalhandoporsp", "trabalhopelaparaiba", "votuporangasp", "jaraguaense", "itaperiu", "itapocu", "capixabo", "iguacu", "macapenses", "lagartense", "arapiraquense")
 
 # -------------------------
 # Party and partisan labels
 # -------------------------
 
 party_terms <- c(
-  "avante", "avante70", "cidadania", "cidadania23", "cidadaniapr", "contecomonovo", "convencaorepublicanos", "dem", "democrata", "democratas", "juntospodemos", "juntospodemosmais", "juntospodemosmal", "mdb", "novo", "novo30", "novodeverdade", "novonacamara", "partido", "partidoliberal", "partidonovo", "partidonovo30", "partidos", "patriota", "patriotape", "patriotarj", "pcb", "pcdob", "pco", "pdt", "phs", "pl22", "plsp", "pmdb", "pmn", "podemos", "pp", "pps", "pr", "prb", "progressista", "progressistas", "progressistassp", "prp", "prtb", "psb", "psb40", "psbma", "psc", "psc20", "pscnacional20", "psd", "psdb", "psdc", "psdnacamara", "psl", "psl17",
-  "pslbrasil", "pslnacamara", "pslraiz", "psol", "psolpa", "pstu", "pt", "ptbahia", "ptb", "ptc", "ptdob", "ptn", "pv", "republicano", "republicanos", "republicanos10", "republicanosnacamara", "republicanosrs", "republicanoss", "solidariedade", "solidariedadecer", "soumdb", "uniaobrasil", "vote19"
+  "avante", "avante70", "pensandoavante", "cidadania", "cidadania23", "cidadaniapr", "contecomonovo", "convencaorepublicanos", "dem", "democrata", "democratas", "juntospodemos", "juntospodemosmais", "juntospodemosmal", "mdb", "novo", "novo30", "novodeverdade", "novonacamara", "partido", "partidoliberal", "partidonovo", "partidonovo30", "partidos", "patriota", "patriotape", "patriotarj", "pcb", "psdbac", "pcdob", "pco", "pdt", "phs", "pl22", "plsp", "pmdb", "pmn", "podemos", "pp", "pps", "pr", "prb", "progressista", "progressistas", "progressistassp", "prp", "prtb", "psb", "psb40", "psbma", "psc", "psc20", "pscnacional20", "psd", "psdb", "psdc", "psdnacamara", "psl", "psl17", "pslbrasil", "pslnacamara", "pslraiz", "psol", "psolpa", "pstu", "pt", "ptbahia", "ptb", "ptc", "ptdob", "ptn", "pv", "republicano", "republicanos", "republicanos10", "republicanosnacamara", "republicanosrs", "republicanoss", "solidariedade", "solidariedadecer", "soumdb", "uniaobrasil", "vote19"
 )
 
 # -------------------------
@@ -260,27 +256,26 @@ party_terms <- c(
 social_media_vernacular_terms <- c(
   "ao vivo", "aovivo", "boanoite", "boasemana", "boatarde", "bomdia", "comente",
   "comentem", "compartilhar", "compartilhe", "compartilhem", "confira", "curta",
-  "curtir", "descricao", "detalhe", "dizer", "direct", "email", "foryou", "foryoupage", "foto", "fyp", "getrepost", "hashtag", "inscreva", "instaphoto", "leia", "link", "namidia", "page", "paratodosverem", "pracegover", "pracegorver", "pratodosverem", "published", "repost", "segue", "seguem", "seguindo", "siga", "sigame", "sugestao", "tamo", "tamojunto", "tbt", "tbtdehoje", "text", "timeline", "vamo", "vamo que vamo", "vamoquevamo", "vamos", "viral", "viralvideo", "viralvideos", "video"
-)
+  "curtir", "descricao", "detalhe", "dizer", "direct", "email", "foryou", "foryoupage", "foto", "fyp", "getrepost", "hashtag", "inscreva", "instaphoto", "leia", "link", "namidia", "page", "paratodosverem", "pracegover", "pracegorver", "pratodosverem", "published", "repost", "segue", "seguem", "seguindo", "siga", "sigame", "sugestao", "tamo", "tamojunto", "tbt", "tbtdehoje", "text", "timeline", "vamo", "vamo que vamo", "vamoquevamo", "vamos", "viral", "viralvideo", "viralvideos", "video", "post", "from", "live", "play", "reshare",
+"makerepost", "storie", "online", "card")
 
 # -------------------------
 # Political titles, offices, and generic mandate terms
 # -------------------------
 
 political_title_terms <- c(
-  "amudancajacomecou", "boratrabalhar", "camara", "camaradosdeputados", "dep", "depfederal", "deputada", "deputadafederal", "deputado", "deputadofederal", "deputadosdem", "equipe", "federal", "federals", "gabinete", "semprepresente", "praseguiremfrente", "trabalhoquedaresultado", "mandatoderesultados", "politico", "politicos", "pracimadeles", "quemvotounaosearrepende", "senador", "trabalho", "vamosemfrente", "eleicao2022", "eleição2022", "eleicoes2022", "eleições2022")
+  "amudancajacomecou", "boratrabalhar", "camara", "camaradosdeputados", "camaradosdeputar", "dep", "depfederal", "deputada", "deputadafederal", "deputado", "deputadofederal", "deputadosdem", "equipe", "federal", "federals", "gabinete", "semprepresente", "praseguiremfrente", "trabalhoquedaresultado", "mandatoderesultados", "politico", "politicos", "pracimadeles", "quemvotounaosearrepende", "senador", "trabalho", "vamosemfrente", "eleicao2022", "eleição2022", "eleicoes2022", "eleições2022")
 
 # -------------------------
-# Time-related terms
+# Generic temporal markers
 # -------------------------
-# Includes months, weekdays, retrospective labels, and generic temporal markers.
 
 time_terms <- c(
   "abril", "agosto", "anos", "atras", "atual", "calendario", "ciclo", "dezembro", "domingo", "fevereiro", "fimdesemana", "janeiro", "julho", "junho", "maio", "marco", "novembro", "outubro", "quarta", "quinta", "resumo da semana", "resumodasemana", "resumodasemano", "restrospectiva2020", "retrospectiva", "retrospectiva2018", "retrospectiva2019", "retrospectiva2020", "retrospectiva2021", "sabado", "segunda", "serie", "setembro", "sexta", "terca", "felizdiadospais", "felizdiadasmaes"
 )
 
 # -------------------------
-# Celebration, greetings, and affective terms
+# Celebration and greetings
 # -------------------------
 
 celebration_terms <- c(
@@ -289,17 +284,13 @@ celebration_terms <- c(
 # -------------------------
 # Generic high-frequency or low-substantive terms
 # -------------------------
-
-generic_stop_words <- c(
-  "acelerar", "achar", "artigo", "assuntos", "busco", "cadastro", "cara", "cobrar", "colocamos", "comigo", "correr", "cumpro", "deixe", "detalhe", "dificil", "entao", "escritorio", "espero", "essencial", "estado", "existir", "fiquem", "fique", "foco", "gostaria", "ideal", "imenso", "individual", "iniciar", "intenso", "longo", "misturar", "parar", "peco", "pedir", "pensar", "pessoal", "podemos", "positivo", "precisamos", "profundo", "prol", "pude", "ramal", "referente", "seguimos", "sensacao", "terminamos", "todo", "unidade", "usar", "vago", "visar")
-
+generic_stop_words <- c("acelerar", "achar", "assuntos", "busco", "cadastro", "cara", "cobrar", "colocamos", "comigo", "correr", "cumpro", "deixe", "detalhe", "dificil", "entao", "escritorio", "espero", "essencial", "estado", "existir", "fiquem", "fique", "foco", "gostaria", "ideal", "imenso", "individual", "iniciar", "intenso", "longo", "misturar", "parar", "peco", "pedir", "pensar", "pessoal", "podemos", "positivo", "precisamos", "profundo", "prol", "pude", "ramal", "referente", "seguimos", "sensacao", "terminamos", "unidade", "usar", "vago", "visar")
 
 # -------------------------
 # Combined custom stopwords
 # -------------------------
 custom_stopwords <- c(
   quanteda::stopwords("pt"),
-  quanteda::stopwords("en"),
   municipality_terms,
   geographic_terms,
   party_terms,
@@ -313,48 +304,59 @@ custom_stopwords <- c(
   stringr::str_to_lower() %>%
   stringr::str_trim() %>%
   unique()
+```
 
-
+```{r}
 # -------------------------
 # Account-specific self terms
 # -------------------------
 generic_profile_terms <- c(
-  "oficial", "deputado", "deputada", "dep", "federal",
-  "senador", "senadora", "vereador", "vereadora",
-  "dr", "dra", "professor", "professora",
-  "psl", "pl", "pt", "psdb", "mdb", "novo", "psol",
-  "brasil", "br", "politico", "politica"
-)
+  "oficial", "deputado", "deputada", "dep", "federal", "senador", "senadora", "vereador", "vereadora", "dr", "dra", "professor", "professora", "psl", "pl", "pt", "psdb", "mdb", "novo", "psol", "brasil", "br", "politico", "politica")
+
 
 clean_self_term <- function(x) {
   x %>%
+    stringr::str_replace_na("") %>%
     stringi::stri_trans_general(id = "Latin-ASCII") %>%
     stringr::str_to_lower() %>%
     stringr::str_replace_all("[^a-z0-9]", " ") %>%
     stringr::str_squish()
 }
 
+
 make_self_terms <- function(author, page_name) {
   
   author_clean <- clean_self_term(author)
   page_clean   <- clean_self_term(page_name)
   
-  author_no_space <- author_clean %>%
-    stringr::str_replace_all("\\s+", "")
+  # Individual components
+  author_tokens <- author_clean %>%
+    stringr::str_split("\\s+") %>%
+    unlist()
   
   page_tokens <- page_clean %>%
     stringr::str_split("\\s+") %>%
     unlist()
+  
+  # Remove generic profile descriptors
+  author_tokens <- author_tokens[
+    author_tokens != "" &
+      !author_tokens %in% generic_profile_terms
+  ]
   
   page_tokens <- page_tokens[
     page_tokens != "" &
       !page_tokens %in% generic_profile_terms
   ]
   
-  # Collapsed page-name variants
-  page_collapsed <- paste0(page_tokens, collapse = "")
+  # Collapsed forms
+  author_no_space <- stringr::str_replace_all(author_clean, "\\s+", "")
+  page_no_space   <- stringr::str_replace_all(page_clean, "\\s+", "")
   
-  # Handle variants removing common suffixes/prefixes.
+  author_collapsed <- paste0(author_tokens, collapse = "")
+  page_collapsed   <- paste0(page_tokens, collapse = "")
+  
+  # Remove common profile prefixes/suffixes from author handles
   author_variants <- author_no_space %>%
     stringr::str_replace_all(
       "(oficial|dep|deputado|deputada|federal|senador|senadora)$",
@@ -365,25 +367,61 @@ make_self_terms <- function(author, page_name) {
       ""
     )
   
-  # Remove party/state digits or common numeric residues.
+  # Remove trailing numeric residues
   author_variants_no_numbers <- author_variants %>%
     stringr::str_replace_all("[0-9]+$", "")
+  
+  # Core name forms
+  core_terms <- unique(c(
+    author_tokens,
+    author_collapsed,
+    author_variants,
+    author_variants_no_numbers,
+    page_tokens,
+    page_collapsed
+  ))
+  
+  core_terms <- core_terms[
+    !is.na(core_terms) & core_terms != ""
+  ]
+  
+  # Common concatenated profile forms
+  # Examples: deputadopimenta, otonidepfederal
+  profile_variants <- unique(c(
+    core_terms,
+    paste0("dep", core_terms),
+    paste0("deputado", core_terms),
+    paste0("deputada", core_terms),
+    paste0("senador", core_terms),
+    paste0("senadora", core_terms),
+    paste0(core_terms, "oficial"),
+    paste0(core_terms, "dep"),
+    paste0(core_terms, "federal"),
+    paste0(core_terms, "depfederal"),
+    paste0(core_terms, "deputadofederal"),
+    paste0(core_terms, "deputadafederal")
+  ))
+  
+  # Possessive-like residues after punctuation removal
+  profile_variants <- unique(c(
+    profile_variants,
+    paste0(profile_variants, "s")
+  ))
   
   unique(c(
     author_clean,
     author_no_space,
-    author_variants,
-    author_variants_no_numbers,
     page_clean,
-    page_tokens,
-    page_collapsed
+    page_no_space,
+    core_terms,
+    profile_variants
   ))
 }
+
 
 account_self_terms <- df_fb %>%
   dplyr::distinct(author, page_name) %>%
   dplyr::rowwise() %>%
-  
   dplyr::mutate(
     term = list(make_self_terms(author, page_name))
   ) %>%
@@ -393,8 +431,7 @@ account_self_terms <- df_fb %>%
     term = term %>%
       stringi::stri_trans_general(id = "Latin-ASCII") %>%
       stringr::str_to_lower() %>%
-      stringr::str_replace_all("[^a-z0-9]", "") %>%
-      stringr::str_trim()
+      stringr::str_replace_all("[^a-z0-9]", "")
   ) %>%
   dplyr::filter(
     term != "",
@@ -403,39 +440,375 @@ account_self_terms <- df_fb %>%
     !term %in% custom_stopwords
   ) %>%
   dplyr::distinct(author, term)
+```
+
+### Domain Setup
+```{r}
+# Helper functions
+normalize_domain <- function(x) {
+  x %>%
+    stringi::stri_trans_general(id = "Latin-ASCII") %>%
+    stringr::str_to_lower() %>%
+    stringr::str_trim() %>%
+    stringr::str_remove("^https?://") %>%
+    stringr::str_remove("^www\\.") %>%
+    stringr::str_remove("/.*$") %>%
+    stringr::str_trim()
+}
+
+make_domain_key <- function(x) {
+  x %>%
+    stringi::stri_trans_general(id = "Latin-ASCII") %>%
+    stringr::str_to_lower() %>%
+    stringr::str_replace_all("[^a-z0-9]", "") %>%
+    stringr::str_trim()
+}
+
+regex_escape <- function(x) {
+  stringr::str_replace_all(x, "([][{}()+*^$|\\\\?.])", "\\\\\\1")
+}
+
 
 # -------------------------
-# Domains
+# Exclusions
 # -------------------------
+domains_to_exclude <- c(
+  "acessa", "agora", "amazonia", "aovivo", "apple", "archive", "arte",
+  "beta", "bit.do", "bit.ly", "bitly", "boatos", "brasis", "buff.ly",
+  "campanha", "caneta", "caras", "china", "bolsonaro", "cutt.ly",
+  "disparada", "ft", "leiaja", "universal", "unicef", "vice", "contigo",
+  "defesa", "dol", "lance", "naoviu", "mural", "page.link", "videos",
+  "waze", "24h", "amanha", "anistia", "belem", "clicr", "clicrdc",
+  "clicrsc", "clicsc", "cpp", "delegados", "ecoa", "go", "guia",
+  "ingresso", "interior", "leia", "liberal", "mapping", "messenger",
+  "nossas", "polis", "previ", "revide", "sabesp", "t.ly", "une", "em", "lula", 'leandre', "m.me", "painel", "surgiu", "atarde", "m", "t.co", "bol", "dilma", "unica", "un", "uai", "temas", "politicos", "novo", "pros", "time", "bonde")
+
+domains_to_exclude_lookup <- tibble::tibble(
+  excluded_domain_raw = domains_to_exclude) %>%
+  dplyr::mutate(
+    excluded_domain = normalize_domain(excluded_domain_raw),
+    excluded_domain_key = make_domain_key(excluded_domain)
+  ) %>%
+  dplyr::filter(
+    excluded_domain != "",
+    excluded_domain_key != ""
+  ) %>%
+  dplyr::distinct(excluded_domain_key, .keep_all = TRUE)
+
+
+# -------------------------
+# Manually specified media/domain list
+# -------------------------
+domains_list_manual <- c(
+  "94fm", "almapreta", "anchor.fm", "aosfatos", "appsindicato", "band", 
+  "bandnewsfm", "bandnewsfmcuritiba", "bandnewsfmrio", "bbc", 
+  "brasilsemmedo", "buzzfeed", "cartacapital", "catracalivre", 
+  "cbncaruaru", "cbncuritiba", "cbnlondrina", "cbnmaringa", 
+  "cbnrecife", "cbnvitoria", "clarin", "cnn", "cnnbrasil", 
+  "coalizaonegrapordireitos", "coletivojuntas", "correiobraziliense", 
+  "dailymail", "eldiario.es", "eleicoesantirracistas", "elpais", 
+  "emdefesadofundoamazonia", "esquerdadiario", "esquerdaonline", 
+  "estadao", "exame", "extra.globo", "folha", "g1.globo", 
+  "gazetadopovo", "glo.bo", "huffpost", "huffpostbrasil", 
+  "independent", "infomoney", "intercept", "istoedinheiro", "istoe", 
+  "jacobin", "jovempan", "lemonde", "mblnews", "metropolenoticias", 
+  "metropolitanoonline", "midianinja", "mises", "nexojornal", 
+  "nytimes", "oantagonista", "observatoriodademocracia", 
+  "observatoriodaimprensa", "observatoriodatelevisao", 
+  "observatoriodoconhecimento", "observatoriog", "oglobo.globo", 
+  "plenonews", "pleno.news", "poder360", "r7", "radiobandeirantes", 
+  "radiocabiuna", "radiocacula", "radiocaxias", "radioclubfm.net", 
+  "radiocomunitariaclubefm", "radioconvencao", "radiocorredor", 
+  "radiocostaverdefm", "radiocruzdemalta", "radiofmz", "radiofolhabv", 
+  "radiogeracao", "radioglobocampogrande", "radioguaratuba", 
+  "radiohora", "radioiara", "radiointegracaoam1180", "radioipiranga", 
+  "radiometropole", "radionereuramos", "radionovaprogresso", 
+  "radiopanoramicafm", "radiopeaobrasil", "radioprata", "radiosanfm", 
+  "radiosantacruz", "radiosaoluiz", "radiosaopedrense", 
+  "radioschroederfm", "radiosoledade", "radiotaquara", "radioterena", 
+  "radiotucunare", "radioturmalina", "radiouniversitariafm", 
+  "radioveracruz", "radiowebcp", "renovamidia", "reuters", "romanews", 
+  "sbt", "substack", "telegraph", "tercalivre", "terrabrasilnoticias", 
+  "theguardian", "theintercept", "uol", "veja", "vejario", "vejasp", 
+  "washingtonpost", "wikipedia", "wsj", "yahoo") %>%
+  normalize_domain()
+
+
+# -------------------------
+# Domains observed in df_fb$domain
+# -------------------------
+domains_from_df_fb <- df_fb %>%
+  dplyr::filter(!is.na(domain), domain != "") %>%
+  dplyr::mutate(
+    domain = normalize_domain(domain),
+    domain_key = make_domain_key(domain)
+  ) %>%
+  dplyr::filter(domain != "", domain_key != "") %>%
+  dplyr::count(domain, domain_key, name = "n_url_mentions") %>%
+  dplyr::arrange(dplyr::desc(n_url_mentions), domain)
+
+
+# -------------------------
+# Domain list
+# -------------------------
+# Includes:
+# 1. manually curated media/outlet names
+# 2. every domain observed in df_fb$domain
+# 3. excludes domains/terms listed in domains_to_exclude
+# -------------------------
+
 domains_list <- c(
-  "94fm", "almapreta", "anchor.fm", "aosfatos", "appsindicato", "band", "bandnewsfm", "bandnewsfmcuritiba", "bandnewsfmrio",
-  "bbc", "brasilsemmedo", "buzzfeed", "cartacapital", "catracalivre", "cbncaruaru", "cbncuritiba", "cbnlondrina",
-  "cbnmaringa", "cbnrecife", "cbnvitoria", "clarin", "cnn", "cnnbrasil", "coalizaonegrapordireitos", "coletivojuntas",
-  "correiobraziliense", "dailymail", "eldiario.es", "eleicoesantirracistas", "elpais", "emdefesadofundoamazonia",
-  "esquerdadiario", "esquerdaonline", "estadao", "exame", "extra.globo", "folha", "g1.globo", "gazetadopovo", "glo.bo",
-  "huffpost", "huffpostbrasil", "independent", "infomoney", "intercept", "istoedinheiro", "istoe", "jacobin", "jovempan",
-  "lemonde", "mblnews", "metropolenoticias", "metropolitanoonline", "midianinja", "mises", "nexojornal", "nytimes", "oantagonista",
-  "observatoriodademocracia", "observatoriodaimprensa", "observatoriodatelevisao", "observatoriodoconhecimento",
-  "observatoriog", "oglobo.globo", "plenonews", "pleno.news", "poder360", "r7", "radiobandeirantes", "radiocabiuna", "radiocacula",
-  "radiocaxias", "radioclubfm.net", "radiocomunitariaclubefm", "radioconvencao", "radiocorredor", "radiocostaverdefm", 
-  "radiocruzdemalta", "radiofmz", "radiofolhabv", "radiogeracao", "radioglobocampogrande", "radioguaratuba", "radiohora",
-  "radioiara", "radiointegracaoam1180", "radioipiranga", "radiometropole", "radionereuramos", "radionovaprogresso",
-  "radiopanoramicafm", "radiopeaobrasil", "radioprata", "radiosanfm", "radiosantacruz", "radiosaoluiz", "radiosaopedrense", 
-  "radioschroederfm", "radiosoledade", "radiotaquara", "radioterena", "radiotucunare", "radioturmalina", "radiouniversitariafm",
-  "radioveracruz", "radiowebcp", "renovamidia", "reuters", "romanews", "sbt", "substack", "telegraph", "tercalivre", "terrabrasilnoticias", "theguardian", "theintercept", "uol", "veja", "vejario", "vejasp", "washingtonpost",
-  "wikipedia", "wsj", "yahoo")
+  domains_list_manual,
+  domains_from_df_fb$domain) %>%
+  unique() %>%
+  sort()
 
-# This creates a matching key that mirrors the text-cleaning procedure used for lemmas. # Example: "g1.globo" becomes "g1globo".
+domains_list <- tibble::tibble(domain = domains_list) %>%
+  dplyr::mutate(
+    domain = normalize_domain(domain),
+    domain_key = make_domain_key(domain)) %>%
+  dplyr::filter(
+    domain != "",
+    domain_key != "",
+    !domain %in% domains_to_exclude_lookup$excluded_domain,
+    !domain_key %in% domains_to_exclude_lookup$excluded_domain_key
+  ) %>%
+  dplyr::distinct(domain_key, .keep_all = TRUE) %>%
+  dplyr::arrange(domain) %>%
+  dplyr::pull(domain)
+
+
+# -------------------------
+# Domain lookup
+# -------------------------
 domain_lookup <- tibble::tibble(domain = domains_list) %>%
   dplyr::mutate(
-    domain_key = domain %>%
-      stringi::stri_trans_general(id = "Latin-ASCII") %>%
-      stringr::str_to_lower() %>%
-      stringr::str_replace_all("[^a-z0-9]", "") %>%
-      stringr::str_trim()
+    domain_key = make_domain_key(domain),
+    in_manual_list = domain %in% domains_list_manual,
+    in_df_fb_domain = domain %in% domains_from_df_fb$domain
   ) %>%
   dplyr::filter(domain_key != "") %>%
-  dplyr::distinct(domain_key, .keep_all = TRUE)
+  dplyr::distinct(domain_key, .keep_all = TRUE) %>%
+  dplyr::left_join(
+    domains_from_df_fb %>%
+      dplyr::select(domain, n_url_mentions),
+    by = "domain"
+  ) %>%
+  dplyr::mutate(
+    n_url_mentions = dplyr::coalesce(n_url_mentions, 0L),
+    domain_source = dplyr::case_when(
+      in_manual_list & in_df_fb_domain ~ "manual_and_df_fb_domain",
+      in_manual_list & !in_df_fb_domain ~ "manual_only",
+      !in_manual_list & in_df_fb_domain ~ "df_fb_domain_only",
+      TRUE ~ "unknown"
+    )
+  ) %>%
+  dplyr::arrange(domain_source, dplyr::desc(n_url_mentions), domain)
+```
+
+```{r}
+# Inspect domain list
+# Summary of final domain sources
+domain_lookup %>%
+  dplyr::count(domain_source, name = "n_domains")
+
+# Full inspection object
+domain_lookup_inspection <- domain_lookup %>%
+  dplyr::select(
+    domain,
+    domain_key,
+    domain_source,
+    in_manual_list,
+    in_df_fb_domain,
+    n_url_mentions
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(in_df_fb_domain),
+    dplyr::desc(n_url_mentions),
+    domain
+  )
+
+domain_lookup_inspection %>%
+  print(n = 100)
+
+# Optional
+# View(domain_lookup_inspection)
+
+
+# -------------------------
+# Inspect exclusions
+# -------------------------
+excluded_domains_found_in_df_fb <- domains_from_df_fb %>%
+  dplyr::semi_join(
+    domains_to_exclude_lookup,
+    by = c("domain_key" = "excluded_domain_key")
+  ) %>%
+  dplyr::arrange(dplyr::desc(n_url_mentions), domain)
+
+excluded_domains_found_in_df_fb
+
+
+excluded_domains_still_in_lookup <- domain_lookup %>%
+  dplyr::semi_join(
+    domains_to_exclude_lookup,
+    by = c("domain_key" = "excluded_domain_key")
+  )
+
+excluded_domains_still_in_lookup
+
+nrow(excluded_domains_still_in_lookup)
+```
+
+```{r}
+# ============================================================
+# Domain aliases for textual detection
+# ============================================================
+# Important:
+# domain_lookup can include all observed URL domains.
+# domain_aliases should be narrower, because these terms are searched directly
+# in post text. Otherwise, every linked domain becomes a possible textual match.
+
+# -------------------------
+# Domains eligible for text detection
+# -------------------------
+# Restrict text matching to manually curated media/outlet domains.
+# This prevents thousands of observed URL domains from becoming text aliases.
+
+domains_for_text_detection <- domain_lookup %>%
+  dplyr::filter(in_manual_list) %>%
+  dplyr::select(domain, domain_key) %>%
+  dplyr::distinct()
+
+
+# -------------------------
+# Automatic aliases for curated domains only
+# -------------------------
+# Examples:
+# "g1.globo"   -> "g1.globo", "g1 globo", "g1globo"
+# "pleno.news" -> "pleno.news", "pleno news", "plenonews"
+# "folha"      -> "folha"
+
+domain_aliases_auto <- domains_for_text_detection %>%
+  dplyr::mutate(
+    alias_exact = domain,
+    alias_spaced = domain %>%
+      stringr::str_replace_all("[\\._\\-]+", " ") %>%
+      stringr::str_squish(),
+    alias_compact = make_domain_key(domain)
+  ) %>%
+  tidyr::pivot_longer(
+    cols = dplyr::starts_with("alias_"),
+    names_to = "alias_type",
+    values_to = "alias"
+  ) %>%
+  dplyr::mutate(
+    alias = alias %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish()
+  ) %>%
+  dplyr::filter(alias != "") %>%
+  dplyr::distinct(domain, alias, .keep_all = TRUE)
+
+
+# -------------------------
+# Manual aliases
+# -------------------------
+# Add aliases for media names that commonly appear as phrases in text.
+
+domain_aliases_manual <- tibble::tribble(
+  ~domain,                  ~alias,
+
+  "g1.globo",               "g1",
+  "g1.globo",               "g1 globo",
+
+  "oglobo.globo",           "o globo",
+  "extra.globo",            "extra",
+
+  "jovempan",               "jovem pan",
+  "oantagonista",           "o antagonista",
+  "cartacapital",           "carta capital",
+  "cnnbrasil",              "cnn brasil",
+  "theintercept",           "the intercept",
+  "gazetadopovo",           "gazeta do povo",
+  "pleno.news",             "pleno news",
+  "correiobraziliense",     "correio braziliense",
+  "brasilsemmedo",          "brasil sem medo",
+  "tercalivre",             "terca livre",
+  "terrabrasilnoticias",    "terra brasil noticias",
+  "nexojornal",             "nexo jornal",
+  "poder360",               "poder 360",
+  "midianinja",             "midia ninja",
+  "esquerdaonline",         "esquerda online",
+  "esquerdadiario",         "esquerda diario",
+  "istoedinheiro",          "isto e dinheiro",
+  "dailymail",              "daily mail",
+  "theguardian",            "the guardian",
+  "washingtonpost",         "washington post",
+  "nytimes",                "new york times",
+  "wsj",                    "wall street journal"
+) %>%
+  dplyr::mutate(
+    domain = normalize_domain(domain),
+    alias = alias %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish()
+  )
+
+
+# -------------------------
+# Combined alias table
+# -------------------------
+
+domain_aliases <- dplyr::bind_rows(
+  domain_aliases_auto %>%
+    dplyr::select(domain, alias) %>%
+    dplyr::mutate(alias_source = "automatic_curated"),
+
+  domain_aliases_manual %>%
+    dplyr::select(domain, alias) %>%
+    dplyr::mutate(alias_source = "manual")
+) %>%
+  dplyr::filter(
+    domain %in% domains_for_text_detection$domain,
+    alias != ""
+  ) %>%
+  dplyr::mutate(
+    alias = alias %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish(),
+    alias_nchar = nchar(alias),
+    alias_key = make_domain_key(alias),
+    alias_source = factor(
+      alias_source,
+      levels = c("manual", "automatic_curated")
+    )
+  ) %>%
+  dplyr::filter(alias_key != "") %>%
+
+  # Keep manual versions first, but preserve different aliases.
+  # Do not distinct by alias_key here.
+  dplyr::arrange(domain, alias_source, alias) %>%
+  dplyr::distinct(domain, alias, .keep_all = TRUE)
+
+
+# -------------------------
+# Remove risky short aliases
+# -------------------------
+
+safe_short_aliases <- c(
+  "g1", "r7", "cnn", "bbc", "uol", "sbt", "wsj"
+)
+
+domain_aliases <- domain_aliases %>%
+  dplyr::filter(
+    alias_nchar >= 4 |
+      alias %in% safe_short_aliases |
+      alias_source == "manual"
+  ) %>%
+  dplyr::arrange(domain, alias_source, alias)
 ```
 
 # Practice Mapping
@@ -542,7 +915,6 @@ summary(Matrix::rowSums(X_hashtag_norm))
 
 ## URL Vector
 ```{r}
-# URL practice vectors:
 # Rows = politicians' accounts.
 # Columns = shared-URL dimensions.
 # Values = number of times each account shared each cleaned URL.
@@ -698,9 +1070,7 @@ text_posts_for_spacy <- df_fb %>%
   dplyr::filter(!is.na(text_combined), text_combined != "") %>%
   dplyr::mutate(
     row_id = dplyr::row_number(),
-    
-    # text_combined is already cleaned.
-    # Here we only remove possible platform / URL residues.
+    # Remove platform URL residues
     text_for_vector = text_combined %>%
       stringr::str_replace_all("\\bhttp\\S+\\b", " ") %>%
       stringr::str_replace_all("\\bwww\\S+\\b", " ") %>%
@@ -711,10 +1081,40 @@ text_posts_for_spacy <- df_fb %>%
       stringr::str_squish()
   ) %>%
   dplyr::filter(text_for_vector != "") %>%
-  dplyr::select(row_id, author, text_for_vector)
+  dplyr::select(row_id, author, hashtags, text_for_vector)
 
 dplyr::glimpse(text_posts_for_spacy)
 ```
+
+```{r}
+# -------------------------
+# Post-specific hashtag terms
+# -------------------------
+# Used to remove from the text vector only terms that were actually hashtags in that particular post.
+post_hashtag_terms <- text_posts_for_spacy %>%
+  dplyr::filter(
+    !is.na(hashtags),
+    hashtags != ""
+  ) %>%
+  dplyr::select(row_id, hashtags) %>%
+  tidyr::separate_rows(hashtags, sep = ",") %>%
+  dplyr::transmute(
+    row_id,
+    token_key = hashtags %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_trim() %>%
+      stringr::str_remove_all("^#") %>%
+      stringr::str_replace_all("[^a-z0-9]", "")
+  ) %>%
+  dplyr::filter(token_key != "") %>%
+  dplyr::distinct()
+
+# drop hashtags from the large text object
+text_posts_for_spacy <- text_posts_for_spacy %>%
+  dplyr::select(-hashtags)
+```
+
 
 ```{r}
 # Parse post-level texts in batches
@@ -776,6 +1176,7 @@ for (b in batch_ids) {
   gc()
 }
 ```
+
 ```{r}
 #Load parsed batches & Remove stopwords
 parsed_files <- list.files(
@@ -792,38 +1193,65 @@ parsed_text <- purrr::map_dfr(
 dplyr::glimpse(parsed_text)
 
 
+# -------------------------
 # Filter tokens and aggregate by account
+# -------------------------
 tokens_text_lemma <- parsed_text %>%
+  # Keep substantive POS categories
   dplyr::filter(pos %in% c("NOUN", "ADJ", "VERB", "PROPN")) %>%
-  dplyr::mutate(
-    lemma = lemma %>%
-      stringi::stri_trans_general(id = "Latin-ASCII") %>%
-      stringr::str_to_lower() %>%
-      stringr::str_replace_all("[^a-z0-9]", "") %>%
-      stringr::str_trim()
+  # Create comparable surface-token and lemma forms.
+  # Input text is already lowercase and ASCII-normalized.
+  dplyr::mutate(token_key = stringr::str_replace_all(
+      token, "[^a-z0-9]", ""),
+    lemma = stringr::str_replace_all(
+      lemma,"[^a-z0-9]","")
   ) %>%
-  dplyr::filter(
-    lemma != "",
-    nchar(lemma) > 3,
-    nchar(lemma) <= 25,
+  
+  dplyr::filter(token_key != "", lemma != "",
+                nchar(lemma) > 3, nchar(lemma) <= 25,
+    # Require textual features to begin with a letter
+    stringr::str_detect(lemma, "^[a-z]"),
+    # Apply general stopwords to both the original token and the spaCy lemma.
+    !token_key %in% custom_stopwords,
     !lemma %in% custom_stopwords,
+    # Same for domain terms
+    !token_key %in% domain_lookup$domain_key,
     !lemma %in% domain_lookup$domain_key,
+    # Basic malformed-token filters
     !stringr::str_detect(lemma, "(.)\\1{2,}"),
-    !stringr::str_detect(lemma, "^[bcdfghjklmnpqrstvwxyz]+$"),
+    !stringr::str_detect(
+      lemma, "^[bcdfghjklmnpqrstvwxyz]+$"),
     stringr::str_detect(lemma, "[aeiou]")
-  ) %>%
-  dplyr::anti_join(
-    account_self_terms,
-    by = c("author", "lemma" = "term")
-  ) %>%
+    ) %>%
+  
+  # Remove terms that were used as hashtags in the post.
+  # Matching occurs against the ORIGINAL spaCy token,
+  dplyr::anti_join(post_hashtag_terms, by = c("row_id", "token_key")) %>%
+  
+  # Remove self-references using the original surface form.
+  # This catches cases where spaCy changes the lemma.
+  dplyr::anti_join(account_self_terms, by = c("author", "token_key" = "term")
+                   ) %>%
+  
+  # Keep lemma-level matching as safeguard.
+  dplyr::anti_join(account_self_terms, by = c("author", "lemma" = "term")
+                   ) %>%
+  
+  # Aggregate after exclusions
   dplyr::count(author, lemma, name = "n")
 
 tokens_text_lemma %>%
-  dplyr::arrange(desc(n)) %>%
-  head(50)
+  dplyr::group_by(lemma) %>%
+  dplyr::summarise(
+    total_n = sum(n),
+    n_accounts = dplyr::n_distinct(author),
+    .groups = "drop"
+  ) %>%
+  dplyr::arrange(desc(total_n)) %>%
+  dplyr::slice_head(n = 100)
 ```
 
-[*Matrix*] The data are still in long format: one row per author–lemma combination. The next steps converts the dataset into a wide sparse matrix. 
+[*Matrix*] The data are still in long format: one row per author–lemma combination. The next steps convert the dataset into a wide sparse matrix. 
 ```{r}
 # Create account-by-text matrix
 X_text_counts <- make_sparse_practice_matrix(
@@ -870,55 +1298,135 @@ summary(Matrix::rowSums(X_text_norm))
 ```{r}
 # Rows = politicians' accounts.
 # Columns = linked-domain dimensions.
-# Values initially = number of times each account shared each domain.
+# Values initially = number of times each account shared or mentioned each domain.
 # Apply TF-IDF to emphasize domains that distinguish accounts.
+
 # -------------------------
-# Domains from linked URLs
+# Domains from linked URLs / df_fb$domain
 # -------------------------
+
 domain_long_links <- df_fb %>%
   dplyr::select(author, domain) %>%
   dplyr::filter(!is.na(domain), domain != "") %>%
   dplyr::mutate(
-    domain = domain %>%
-      stringi::stri_trans_general(id = "Latin-ASCII") %>%
-      stringr::str_to_lower() %>%
-      stringr::str_trim()
+    domain = normalize_domain(domain)
   ) %>%
   dplyr::filter(domain != "") %>%
   dplyr::count(author, domain, name = "n")
 
+
 # -------------------------
-# Domains mentioned in parsed text
+# Domains mentioned in text
 # -------------------------
-# These are terms that appeared in the textual column but should be treated
-# as media-domain features rather than text features.
-text_domains_long <- parsed_text %>%
-  dplyr::filter(pos %in% c("NOUN", "PROPN")) %>%
+# These are media/domain aliases that appear in text_for_vector.
+# This is done before tokenization, so multi-word names such as
+# "jovem pan", "o antagonista", "carta capital", and "cnn brasil"
+# can be detected.
+# -------------------------
+
+# Prepare one regex pattern from the alias table.
+# Longer aliases come first to reduce partial-match problems.
+regex_escape <- function(x) {
+  gsub(
+    pattern = "([.\\^$|()\\[\\]{}*+?\\\\])",
+    replacement = "\\\\\\1",
+    x = x,
+    perl = TRUE
+  )
+}
+
+domain_alias_patterns <- domain_aliases %>%
   dplyr::mutate(
-    lemma_key = lemma %>%
+    alias_pattern = regex_escape(alias),
+    alias_pattern = stringr::str_replace_all(
+      alias_pattern,
+      "\\s+",
+      "\\\\s+"
+    ),
+    alias_pattern = paste0("\\b", alias_pattern, "\\b")
+  ) %>%
+  dplyr::arrange(dplyr::desc(nchar(alias)), alias)
+
+domain_regex <- paste(domain_alias_patterns$alias_pattern, collapse = "|")
+
+
+# Create a named lookup from matched alias_key to canonical domain.
+# If the same alias maps to more than one domain, keep the first and inspect below.
+alias_to_domain <- domain_alias_patterns %>%
+  dplyr::select(alias_key, domain, alias) %>%
+  dplyr::distinct(alias_key, .keep_all = TRUE)
+
+
+# Inspection: aliases that point to multiple domains
+ambiguous_aliases <- domain_alias_patterns %>%
+  dplyr::group_by(alias_key, alias) %>%
+  dplyr::summarise(
+    n_domains = dplyr::n_distinct(domain),
+    domains = paste(sort(unique(domain)), collapse = "; "),
+    .groups = "drop"
+  ) %>%
+  dplyr::filter(n_domains > 1)
+
+ambiguous_aliases
+
+
+# Detect textual media/domain mentions.
+text_domains_long <- text_posts_for_spacy %>%
+  dplyr::mutate(
+    text_for_domain_detection = text_for_vector %>%
       stringi::stri_trans_general(id = "Latin-ASCII") %>%
       stringr::str_to_lower() %>%
-      stringr::str_replace_all("[^a-z0-9]", "") %>%
-      stringr::str_trim()
+      stringr::str_squish(),
+
+    matched_aliases = stringr::str_extract_all(
+      text_for_domain_detection,
+      stringr::regex(domain_regex, ignore_case = TRUE)
+    )
   ) %>%
-  dplyr::filter(lemma_key != "") %>%
-  dplyr::inner_join(
-    domain_lookup,
-    by = c("lemma_key" = "domain_key")
+  dplyr::select(author, matched_aliases) %>%
+  tidyr::unnest_longer(matched_aliases, values_to = "matched_alias") %>%
+  dplyr::filter(!is.na(matched_alias), matched_alias != "") %>%
+  dplyr::mutate(
+    matched_alias = matched_alias %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish(),
+    alias_key = make_domain_key(matched_alias)
   ) %>%
+  dplyr::left_join(
+    alias_to_domain,
+    by = "alias_key"
+  ) %>%
+  dplyr::filter(!is.na(domain), domain != "") %>%
   dplyr::count(author, domain, name = "n")
+
+
+# -------------------------
+# Inspect text-domain matches
+# -------------------------
+text_domains_long %>%
+  dplyr::arrange(dplyr::desc(n)) %>%
+  print(n = 100)
+
+text_domains_long %>%
+  dplyr::summarise(
+    n_authors = dplyr::n_distinct(author),
+    n_domains = dplyr::n_distinct(domain),
+    total_text_domain_mentions = sum(n, na.rm = TRUE)
+  )
+
 
 # -------------------------
 # Unified domain vector
 # -------------------------
 domain_long <- dplyr::bind_rows(
   domain_long_links,
-  text_domains_long
-) %>%
+  text_domains_long) %>%
   dplyr::group_by(author, domain) %>%
-  dplyr::summarise(n = sum(n), .groups = "drop") %>%
+  dplyr::summarise(n = sum(n, na.rm = TRUE), .groups = "drop") %>%
   dplyr::mutate(feature = paste0("domain:", domain)) %>%
   dplyr::select(author, feature, n)
+
 
 # -------------------------
 # Activity threshold
@@ -929,7 +1437,7 @@ min_unique_domains <- 5
 domain_accounts_to_keep <- domain_long %>%
   dplyr::group_by(author) %>%
   dplyr::summarise(
-    total_domain_links = sum(n),
+    total_domain_links = sum(n, na.rm = TRUE),
     n_unique_domains = dplyr::n_distinct(feature),
     .groups = "drop"
   ) %>%
@@ -944,7 +1452,10 @@ domain_long_filtered <- domain_long %>%
 
 rm(domain_accounts_to_keep, min_domain_links, min_unique_domains)
 
-# Create account-by-domain count matrix.
+
+# -------------------------
+# Create account-by-domain count matrix
+# -------------------------
 X_domain_counts <- make_sparse_practice_matrix(
   data = domain_long_filtered,
   account_col = author,
@@ -966,11 +1477,16 @@ X_domain_tfidf <- apply_tfidf_sparse(
 # Pairwise volume-insensitive comparison is handled later by cosine similarity.
 X_domain_norm <- row_l1_normalize(X_domain_tfidf)
 
+
+# -------------------------
 # Inspect
+# -------------------------
 dim(X_domain_counts)
 dim(X_domain_tfidf)
+
 summary(Matrix::rowSums(X_domain_norm))
-sum(Matrix::rowSums(X_domain_norm) == 0) #No zero rows among the 461 accounts included in X_domain_norm.
+
+sum(Matrix::rowSums(X_domain_norm) == 0)
 
 domain_long %>%
   dplyr::distinct(author) %>%
@@ -981,6 +1497,59 @@ df_fb %>%
   dplyr::summarise(n_total_accounts = dplyr::n())
 ```
 
+
+```{r}
+# Exportable domain-count table by source
+
+# Domains from linked URLs / df_fb$domain
+domain_from_url <- domain_long_links %>%
+  dplyr::mutate(source = "df_fb_domain_column") %>%
+  dplyr::select(author, source, domain, n)
+
+# Domains mentioned in text through alias/regex matching
+domain_from_text <- text_domains_long %>%
+  dplyr::mutate(source = "text_regex") %>%
+  dplyr::select(author, source, domain, n)
+
+# Combined exportable object
+domain_counts_by_source <- dplyr::bind_rows(
+  domain_from_url,
+  domain_from_text) %>%
+  dplyr::arrange(author, source, dplyr::desc(n), domain)
+
+
+# -------------------------
+# Inspect
+# -------------------------
+dplyr::glimpse(domain_counts_by_source)
+
+domain_counts_by_source %>%
+  dplyr::count(source, name = "n_author_domain_rows")
+
+domain_counts_by_source %>%
+  dplyr::group_by(source) %>%
+  dplyr::summarise(
+    n_authors = dplyr::n_distinct(author),
+    n_domains = dplyr::n_distinct(domain),
+    total_mentions = sum(n, na.rm = TRUE),
+    .groups = "drop")
+
+
+# Most frequent domains by source
+domain_counts_by_source %>%
+  dplyr::group_by(source, domain) %>%
+  dplyr::summarise(
+    total_mentions = sum(n, na.rm = TRUE),
+    n_authors = dplyr::n_distinct(author),
+    .groups = "drop"
+  ) %>%
+  dplyr::arrange(source, dplyr::desc(total_mentions)) %>%
+  print(n = 100)
+```
+###Inspection
+```{r}
+table(domain_counts_by_source$source)
+```
 ## Metadata
 ```{r}
 # Create account metadata for network analyses
@@ -1008,10 +1577,37 @@ account_metadata <- df_fb %>%
     mean_engagement = mean(engagement, na.rm = TRUE),
     .groups = "drop"
   )
+
+# -------------------------
+# Q-post summary by account
+# -------------------------
+q_posts_by_author <- df_fb_election %>%
+  dplyr::mutate(
+    author = as.character(author),
+    Q1 = as.integer(Q1),
+    Q2 = as.integer(Q2),
+    Q3 = as.integer(Q3),
+    PEC135 = as.integer(PEC135)) %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    Q1 = sum(Q1 == 1, na.rm = TRUE),
+    Q2 = sum(Q2 == 1, na.rm = TRUE),
+    Q3 = sum(Q3 == 1, na.rm = TRUE),
+    PEC135_election = dplyr::first(stats::na.omit(PEC135)),
+    .groups = "drop") %>%
+  dplyr::mutate(PEC135_election = dplyr::if_else(
+      is.na(PEC135_election), 0L, PEC135_election),
+    is_wolf = dplyr::case_when(
+      Q2 >= 10 & PEC135_election == 1 ~ 1L,
+      TRUE ~ 0L))
 ```
 
 ##### Export
 ```{r}
+readr::write_rds(
+  domain_counts_by_source,
+  here::here("_processed_data", "domain_counts_by_source.rds"))
+
 account_by_media_domain_counts <- dplyr::bind_rows(
   domain_long_links,
   text_domains_long) %>%
@@ -1031,13 +1627,12 @@ readr::write_rds(
   account_by_media_domain_counts,
   here::here("_processed_data", "account_by_media_domain_counts.rds"))
 
-# account_by_media_domain_counts_csv <- account_by_media_domain_counts %>%
-#   as.data.frame() %>%
-#   tibble::rownames_to_column("author")
-# readr::write_csv2(
-#   account_by_media_domain_counts_csv,
-#   here::here("_processed_data", "account_by_media_domain_counts.csv")
-# )
+account_by_media_domain_counts_csv <- account_by_media_domain_counts %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("author")
+readr::write_csv2(
+  account_by_media_domain_counts_csv,
+  here::here("_processed_data", "account_by_media_domain_counts.csv"))
 
 # -------------------------------------------------------------------------
 # Export Text Data
@@ -1081,11 +1676,11 @@ tokens_text_lemma_monthly <- parsed_text %>%
 # Export the long monthly data
 readr::write_rds(
   tokens_text_lemma_monthly,
-  here::here("..", "_processed_data", "practice_vectors", "tokens_text_lemma_monthly.rds"))
+  here::here("_processed_data", "practice_vectors", "tokens_text_lemma_monthly.rds"))
 
 readr::write_rds(
   X_text_norm,
-  here::here("..", "_processed_data", "practice_vectors", "X_text_norm.rds")
+  here::here("_processed_data", "practice_vectors", "X_text_norm.rds")
 )
 # -------------------------
 # Export other vectors
@@ -1130,71 +1725,84 @@ objects_to_keep <- c(
 
 # Multimodal Matrix
 ```{r}
+# -------------------------
 # Align all practice vectors by account
+# -------------------------
+# Each vector may include a slightly different set of accounts.
+# We align rows so that cosine matrices are directly comparable.
+
 all_accounts <- Reduce(
   union,
   list(
     rownames(X_hashtag_norm),
     rownames(X_domain_norm),
-    rownames(X_url_norm),
-    rownames(X_text_norm)
-  )
-)
+    # rownames(X_url_norm),
+    rownames(X_text_norm)))
 
 all_accounts <- sort(all_accounts)
 
 X_hashtag_aligned <- align_sparse_rows(X_hashtag_norm, all_accounts)
 X_domain_aligned  <- align_sparse_rows(X_domain_norm, all_accounts)
-X_url_aligned     <- align_sparse_rows(X_url_norm, all_accounts)
+# X_url_aligned   <- align_sparse_rows(X_url_norm, all_accounts)
 X_text_aligned    <- align_sparse_rows(X_text_norm, all_accounts)
 
-  # Inspect
-  dim(X_hashtag_aligned)
-  dim(X_domain_aligned)
-  dim(X_url_aligned)
-  dim(X_text_aligned)
+# -------------------------
+# Inspect aligned matrices
+# -------------------------
+dim(X_hashtag_aligned)
+dim(X_domain_aligned)
+# dim(X_url_aligned)
+dim(X_text_aligned)
 ```
 ## Cosine Similarity
 *Reasoning behind threshold for edges*: A low threshold (e.g. 0.10) may retain many weak similarities that are technically nonzero but substantively modest. A higher threshold focuses the analysis on accounts with stronger overlap. On the other hand, a higher threshold reduces computational burden after similarity estimation. Diagnostics, plotting, community detection, centrality measures, and exporting edge lists will all be faster if the network has fewer edges.
 
 ```{r}
 # -------------------------
-# Define modality weights
+# Define modalities
 # -------------------------
-weight_text    <- 5
-weight_hashtag <- 1
-weight_url     <- 1
-weight_domain  <- 0.5
+# No outset modality weights are used here.
+# Each modality contributes equally to the unweighted total similarity.
+modalities <- c("text", "hashtag", "domain")
+n_modalities_available <- length(modalities)
 
-total_weight <- weight_text + weight_hashtag + weight_url + weight_domain
 
 # -------------------------
 # Modality-specific cosine similarities
 # -------------------------
+
 S_text <- cosine_similarity(X_text_aligned)
 S_hashtag <- cosine_similarity(X_hashtag_aligned)
-S_url <- cosine_similarity(X_url_aligned)
+# S_url <- cosine_similarity(X_url_aligned)
 S_domain <- cosine_similarity(X_domain_aligned)
-  # Inspect
-  # dim(S_text)
-  # dim(S_hashtag)
-  # dim(S_url)
-  # dim(S_domain)
 
 # -------------------------
-# Combined Similarity matrix
+# Inspect modality-specific matrices
 # -------------------------
+dim(S_text)
+dim(S_hashtag)
+# dim(S_url)
+dim(S_domain)
+
+
+# -------------------------
+# Combined similarity matrix
+# -------------------------
+# similarity_total is the unweighted average of modality-specific cosine scores.
+# It remains bounded between 0 and 1.
+# The multimodal bonus is applied later at the edge-construction stage.
+
 S_multimodal_practices <- (
-  S_text    * weight_text +
-  S_hashtag * weight_hashtag +
-  S_url     * weight_url +
-  S_domain  * weight_domain
-) / total_weight
+  S_text +
+    S_hashtag +
+    # S_url +
+    S_domain
+  ) / n_modalities_available
 
-diag(S_multimodal_practices) <- 0
 
-# Inspect
-# S_multimodal_practices
+# -------------------------
+# Inspect combined matrix
+# -------------------------
 dim(S_multimodal_practices)
 ```
 
@@ -1202,7 +1810,8 @@ dim(S_multimodal_practices)
 # -------------------------
 # Helper: convert similarity matrix to pairwise dataset
 # -------------------------
-# The purpose of this step is to inspect total similarity and modality-specific similarity for pairs of politicians.
+# The purpose of this step is to inspect total similarity and
+# modality-specific similarity for pairs of politicians.
 matrix_to_pairwise <- function(mat, value_name) {
   as.data.frame(
     as.table(as.matrix(mat)),
@@ -1227,147 +1836,236 @@ matrix_to_pairwise <- function(mat, value_name) {
 # -------------------------
 similarity_values <- matrix_to_pairwise(
   S_multimodal_practices,
-  "similarity_total"
-) %>%
+  "similarity_total") %>%
   dplyr::left_join(
     matrix_to_pairwise(S_text, "similarity_text"),
-    by = c("source", "target")
-  ) %>%
+    by = c("source", "target")) %>%
   dplyr::left_join(
     matrix_to_pairwise(S_hashtag, "similarity_hashtag"),
     by = c("source", "target")
   ) %>%
-  dplyr::left_join(
-    matrix_to_pairwise(S_url, "similarity_url"),
-    by = c("source", "target")
-  ) %>%
+  # dplyr::left_join(
+  #   matrix_to_pairwise(S_url, "similarity_url"),
+  #   by = c("source", "target")
+  # ) %>%
   dplyr::left_join(
     matrix_to_pairwise(S_domain, "similarity_domain"),
-    by = c("source", "target")
-  )
+    by = c("source", "target"))
 
+
+# -------------------------
 # Inspect
+# -------------------------
 dplyr::glimpse(similarity_values)
 ```
 ## Edge-construction 
 ```{r}
+# Rules
+# Minimum total similarity required to establish an edge.
+similarity_threshold <- 0.15
+
+# Minimum modality-specific similarity required for a modality
+# to count as substantively active in the dyad.
+# This is used only for the multimodal bonus.
+modality_presence_threshold <- 0.15
+
+
 # -------------------------
-# Compute modality contributions
+# Compute modality shares and multimodal bonus
 # -------------------------
+# We keep the edge if total similarity is high enough,
+# AND increase the edge weight when similarity appears across
+# multiple modalities.
+
 similarity_values <- similarity_values %>%
   dplyr::mutate(
-    contribution_text = similarity_text * weight_text,
-    contribution_hashtag = similarity_hashtag * weight_hashtag,
-    contribution_url = similarity_url * weight_url,
-    contribution_domain = similarity_domain * weight_domain,
-    
-    contribution_total = contribution_text +
+    # -------------------------
+    # Unweighted modality contributions
+    # -------------------------
+    # These are diagnostic values. They are not outset weights.
+    contribution_text = similarity_text,
+    contribution_hashtag = similarity_hashtag,
+    # contribution_url = similarity_url,
+    contribution_domain = similarity_domain,
+
+    contribution_total =
+      contribution_text +
       contribution_hashtag +
-      contribution_url +
+      # contribution_url +
       contribution_domain,
-    
+
+    # -------------------------
+    # Modality shares
+    # -------------------------
+    # These are retained for auditing.
+    # They show how much of the raw similarity comes from each modality.
+    # They are no longer used to exclude edges.
+
     text_share = dplyr::if_else(
       contribution_total > 0,
-      contribution_text / contribution_total, 0),
-    
+      contribution_text / contribution_total,
+      0),
+
     hashtag_share = dplyr::if_else(
       contribution_total > 0,
-      contribution_hashtag / contribution_total, 0),
-    
-    url_share = dplyr::if_else(
-      contribution_total > 0,
-      contribution_url / contribution_total, 0),
-    
+      contribution_hashtag / contribution_total,
+      0),
+
+    # url_share = dplyr::if_else(
+    #   contribution_total > 0,
+    #   contribution_url / contribution_total,
+    #   0),
+
     domain_share = dplyr::if_else(
       contribution_total > 0,
-      contribution_domain / contribution_total, 0),
-    
+      contribution_domain / contribution_total,
+      0),
+
+    max_share = pmax(
+      text_share,
+      hashtag_share,
+      # url_share,
+      domain_share,
+      na.rm = TRUE),
+
+
+    # -------------------------
+    # Active modality indicators
+    # -------------------------
+    # A modality is active if its modality-specific cosine similarity
+    # meets or exceeds the modality-presence threshold.
+
+    active_text = similarity_text >= modality_presence_threshold,
+    active_hashtag = similarity_hashtag >= modality_presence_threshold,
+    # active_url = similarity_url >= modality_presence_threshold,
+    active_domain = similarity_domain >= modality_presence_threshold,
+
+    # -------------------------
+    # Number of modalities above threshold
+    # -------------------------
+    # This is the basis for the multimodal bonus.
+    # One active modality  -> multiplier of 1
+    # Two active modalities -> multiplier of 2
+    # Three active modalities -> multiplier of 3
+
+    n_modalities_above_threshold =
+      as.integer(active_text) +
+      as.integer(active_hashtag) +
+      # as.integer(active_url) +
+      as.integer(active_domain),
+
+    # -------------------------
+    # Alternative loose activity count
+    # -------------------------
+    # This preserves the earlier diagnostic logic.
+    # It counts modalities that contribute at least 1% of the raw similarity.
+    # This is useful for auditing but is not used to construct edges.
+
+    n_active_modalities_loose =
+      as.integer(text_share > 0.01) +
+      as.integer(hashtag_share > 0.01) +
+      # as.integer(url_share > 0.01) +
+      as.integer(domain_share > 0.01),
+
+    # -------------------------
+    # Non-domain similarity
+    # -------------------------
+    # This recomputes similarity while excluding the domain modality.
+    # It is retained only as a diagnostic variable.
+
     non_domain_similarity = (
-      contribution_text + contribution_hashtag + contribution_url) / (weight_text + weight_hashtag + weight_url)
-  )
+      similarity_text +
+        # similarity_url +
+        similarity_hashtag) / 2,
+
+
+    # -------------------------
+    # Multimodal edge weights
+    # -------------------------
+    # similarity_total remains the unweighted cosine-style score.
+    # weight_multimodal_bonus is the final edge weight.
+    # It strengthens ties that are supported by more modalities.
+
+    weight_base = similarity_total,
+
+    multimodal_multiplier = dplyr::if_else(
+      n_modalities_above_threshold > 0,
+      n_modalities_above_threshold,
+      1L),
+
+    weight_multimodal_bonus =
+      weight_base * multimodal_multiplier)
 ```
 
 *_contribution* values are the weighted similarity scores from each modality; 
 *_share* values indicate the proportion of the total multimodal similarity accounted for by each modality.
 *non_domain_similarity* recomputes similarity while excluding the domain modality.
 
+
 ```{r}
 # -------------------------
-# Edge-construction rules
+# Edge list
 # -------------------------
-similarity_threshold <- 0.10 #Revised below. 
+# Edge eligibility:
+# 1. The pair must meet the total similarity threshold.
+# 2. The pair must have at least one modality above the modality threshold.
+# There is no max-share exclusion.
+# Single-modality ties can remain in the network, but they receive no bonus.
 
-# Minimum share for a modality to count as substantively contributing.
-min_modality_share <- 0.01
+edges_multimodal_practices <- similarity_values %>%
+  dplyr::filter(
+    similarity_total >= similarity_threshold,
+    n_modalities_above_threshold >= 1
+  ) %>%
+  dplyr::transmute(
+    source,
+    target,
 
-# Maximum allowed share for any single modality.
-# This avoids edges that are almost entirely produced by only one layer.
-max_modality_share <- 0.9
+    # Final edge weight:
+    # total similarity multiplied by number of modalities above threshold.
+    weight = weight_multimodal_bonus,
 
-# Minimum number of modalities that must contribute at least min_modality_share.
-min_active_modalities <- 2
+    # Base similarity score, bounded between 0 and 1.
+    similarity_total,
+
+    # Weight diagnostics.
+    weight_base,
+    multimodal_multiplier,
+    weight_multimodal_bonus,
+
+    # Modality-specific similarities.
+    similarity_text,
+    similarity_hashtag,
+    # similarity_url,
+    similarity_domain,
+
+    # Active-modality indicators.
+    active_text,
+    active_hashtag,
+    # active_url,
+    active_domain,
+    n_modalities_above_threshold,
+
+    # Audit variables.
+    text_share,
+    hashtag_share,
+    # url_share,
+    domain_share,
+    max_share,
+    n_active_modalities_loose,
+    non_domain_similarity) %>%
+  dplyr::arrange(dplyr::desc(weight))
+
 
 # -------------------------
-# Compute modality shares
+# Inspect edge list
 # -------------------------
-similarity_values <- similarity_values %>%
-  dplyr::mutate(
-    contribution_text = similarity_text * weight_text,
-    contribution_hashtag = similarity_hashtag * weight_hashtag,
-    contribution_url = similarity_url * weight_url,
-    contribution_domain = similarity_domain * weight_domain,
-    
-    contribution_total = contribution_text +
-      contribution_hashtag +
-      contribution_url +
-      contribution_domain,
-    
-    text_share = dplyr::if_else(
-      contribution_total > 0,
-      contribution_text / contribution_total,
-      0
-    ),
-    
-    hashtag_share = dplyr::if_else(
-      contribution_total > 0,
-      contribution_hashtag / contribution_total,
-      0
-    ),
-    
-    url_share = dplyr::if_else(
-      contribution_total > 0,
-      contribution_url / contribution_total,
-      0
-    ),
-    
-    domain_share = dplyr::if_else(
-      contribution_total > 0,
-      contribution_domain / contribution_total,
-      0
-    ),
-    
-    max_share = pmax(
-      text_share,
-      hashtag_share,
-      url_share,
-      domain_share,
-      na.rm = TRUE
-    ),
-    
-    n_active_modalities =
-      as.integer(text_share >= min_modality_share) +
-      as.integer(hashtag_share >= min_modality_share) +
-      as.integer(url_share >= min_modality_share) +
-      as.integer(domain_share >= min_modality_share),
-    
-    non_domain_similarity = (
-      contribution_text +
-        contribution_hashtag +
-        contribution_url
-    ) / (weight_text + weight_hashtag + weight_url)
-  )
+
+dplyr::glimpse(edges_multimodal_practices)
+
+edges_multimodal_practices %>%
+  dplyr::slice_head(n = 30)
 ```
-
 *Threshold diagnosis*
 ```{r}
 threshold_grid <- c(
@@ -1375,62 +2073,117 @@ threshold_grid <- c(
 
 account_names <- rownames(S_multimodal_practices)
 
+
+# -------------------------
+# Diagnostic helper
+# -------------------------
+# For each threshold, we:
+# 1. treat the threshold as the total similarity cutoff;
+# 2. also use it as the modality-presence cutoff;
+# 3. construct multimodality-adjusted edge weights.
+
 get_threshold_diagnostics <- function(th, similarity_values, account_names) {
-  
+
   edges_th <- similarity_values %>%
+    dplyr::mutate(
+
+      # Recompute active modalities for this threshold.
+      active_text_th = similarity_text >= th,
+      active_hashtag_th = similarity_hashtag >= th,
+      # active_url_th = similarity_url >= th,
+      active_domain_th = similarity_domain >= th,
+
+      n_modalities_above_threshold_th =
+        as.integer(active_text_th) +
+        as.integer(active_hashtag_th) +
+        # as.integer(active_url_th) +
+        as.integer(active_domain_th),
+
+      multimodal_multiplier_th = dplyr::if_else(
+        n_modalities_above_threshold_th > 0,
+        n_modalities_above_threshold_th,
+        1L
+      ),
+
+      weight_th = similarity_total * multimodal_multiplier_th
+    ) %>%
     dplyr::filter(
       similarity_total >= th,
-      n_active_modalities >= min_active_modalities,
-      max_share <= max_modality_share
-    )
-  
-  if (nrow(edges_th) == 0) {
-    return(
-      tibble::tibble(
-        threshold = th,
-        n_edges = 0L,
-        density = 0,
-        min_edges_account = 0L,
-        mean_edges_account = 0,
-        median_edges_account = 0,
-        max_edges_account = 0L,
-        mean_weight = NA_real_,
-        median_weight = NA_real_,
-        min_weight = NA_real_,
-        max_weight = NA_real_
-      )
-    )
-  }
-  
-  account_edge_counts <- edges_th %>%
-    dplyr::select(source, target) %>%
-    tidyr::pivot_longer(
-      cols = c(source, target),
-      values_to = "author"
+      n_modalities_above_threshold_th >= 1
     ) %>%
-    dplyr::count(author, name = "n_edges_account") %>%
-    dplyr::right_join(
-      tibble::tibble(author = account_names),
-      by = "author"
-    ) %>%
-    dplyr::mutate(
-      n_edges_account = tidyr::replace_na(n_edges_account, 0L)
+    dplyr::transmute(
+      source,
+      target,
+      weight = weight_th,
+      similarity_total,
+      n_modalities_above_threshold = n_modalities_above_threshold_th
     )
-  
+
+  vertices_th <- tibble::tibble(author = account_names)
+
+  g_th <- igraph::graph_from_data_frame(
+    d = edges_th,
+    vertices = vertices_th,
+    directed = FALSE
+  )
+
+  g_th <- igraph::simplify(
+    g_th,
+    remove.multiple = TRUE,
+    remove.loops = TRUE,
+    edge.attr.comb = list(weight = "mean", "ignore")
+  )
+
+  comp <- igraph::components(g_th)
+
   tibble::tibble(
     threshold = th,
-    n_edges = nrow(edges_th),
-    density = n_edges / (length(account_names) * (length(account_names) - 1) / 2),
-    min_edges_account = min(account_edge_counts$n_edges_account),
-    mean_edges_account = mean(account_edge_counts$n_edges_account),
-    median_edges_account = median(account_edge_counts$n_edges_account),
-    max_edges_account = max(account_edge_counts$n_edges_account),
-    mean_weight = mean(edges_th$similarity_total),
-    median_weight = median(edges_th$similarity_total),
-    min_weight = min(edges_th$similarity_total),
-    max_weight = max(edges_th$similarity_total)
+    n_nodes = igraph::vcount(g_th),
+    n_edges = igraph::ecount(g_th),
+
+    # The proportion of all possible edges that are actually present.
+    # Maximum possible edges = n_nodes * (n_nodes - 1) / 2.
+    density = igraph::edge_density(g_th),
+
+    n_isolates = sum(igraph::degree(g_th) == 0),
+
+    # Set of nodes connected to one another directly or indirectly.
+    n_components = comp$no,
+
+    # Size of the largest connected part of the network.
+    largest_component_size = max(comp$csize),
+    largest_component_share = max(comp$csize) / igraph::vcount(g_th),
+
+    mean_degree = mean(igraph::degree(g_th)),
+    median_degree = median(igraph::degree(g_th)),
+    max_degree = max(igraph::degree(g_th)),
+
+    mean_weight = ifelse(
+      igraph::ecount(g_th) > 0,
+      mean(igraph::E(g_th)$weight),
+      NA_real_
+    ),
+
+    median_weight = ifelse(
+      igraph::ecount(g_th) > 0,
+      median(igraph::E(g_th)$weight),
+      NA_real_
+    ),
+
+    mean_modalities_above_threshold = ifelse(
+      nrow(edges_th) > 0,
+      mean(edges_th$n_modalities_above_threshold),
+      NA_real_
+    ),
+
+    median_modalities_above_threshold = ifelse(
+      nrow(edges_th) > 0,
+      median(edges_th$n_modalities_above_threshold),
+      NA_real_
+    )
   )
 }
+
 
 threshold_diagnostics <- purrr::map_dfr(
   threshold_grid,
@@ -1441,43 +2194,10 @@ threshold_diagnostics <- purrr::map_dfr(
 
 threshold_diagnostics
 ```
+*Summary*: The threshold was selected by inspecting how alternative cutoffs affected density, isolates, and the size of the largest connected component. Very low thresholds retained a large share of possible ties, producing dense networks in which weak similarities may obscure meaningful differences. Very high thresholds produced substantial fragmentation, excluding many politicians from the main relational structure. A threshold of 0.15 offered a balance between selectivity and inclusion: it reduced density to 0.12 while retaining 438 of 485 politicians in the largest component.
 
-```{r}
-# -------------------------
-# Edge list
-# -------------------------
-edges_multimodal_practices <- similarity_values %>%
-  dplyr::filter(
-    similarity_total >= similarity_threshold,
-    n_active_modalities >= min_active_modalities,
-    max_share <= max_modality_share
-  ) %>%
-  dplyr::transmute(
-    source,
-    target,
-    similarity_total,
-    similarity_text,
-    similarity_hashtag,
-    similarity_url,
-    similarity_domain,
-    text_share,
-    hashtag_share,
-    url_share,
-    domain_share,
-    max_share,
-    n_active_modalities,
-    non_domain_similarity
-  ) %>%
-  dplyr::arrange(dplyr::desc(similarity_total))
 
-# Inspect
-dplyr::glimpse(edges_multimodal_practices)
-
-edges_multimodal_practices %>%
-  dplyr::slice_head(n = 30)
-```
 #### Inspection
-
 ```{r}
 # -------------------------
 # Accounts to inspect
@@ -1487,12 +2207,14 @@ accounts_to_check <- c(
   "biakicisoficial",
   "bolsonaro.enb",
   "depheliolopes",
-  "tabataamaralSP"
-)
+  "tabataamaralSP")
+
 
 # -------------------------
 # Helper: top shared features explaining cosine similarity
 # -------------------------
+# This helper identifies which shared features contribute most to a dyad's
+# modality-specific cosine similarity.
 
 get_top_shared_features <- function(X, source, target, n = 10, prefix_to_remove = NULL) {
   
@@ -1544,9 +2266,13 @@ get_top_shared_features <- function(X, source, target, n = 10, prefix_to_remove 
     paste(collapse = "; ")
 }
 
+
 # -------------------------
 # Inspect selected dyads
 # -------------------------
+# Edge is established if:
+# 1. total similarity meets the edge threshold;
+# 2. at least one modality-specific similarity meets the modality threshold.
 
 edges_accounts_to_check <- similarity_values %>%
   dplyr::filter(
@@ -1554,11 +2280,25 @@ edges_accounts_to_check <- similarity_values %>%
     target %in% accounts_to_check
   ) %>%
   dplyr::mutate(
-    edge_established = dplyr::case_when(
-      similarity_total >= similarity_threshold &
-        n_active_modalities >= min_active_modalities &
-        max_share <= max_modality_share ~ TRUE,
-      TRUE ~ FALSE
+    pass_similarity_threshold =
+      similarity_total >= similarity_threshold,
+    
+    pass_modality_presence =
+      n_modalities_above_threshold >= 1,
+    
+    edge_established =
+      pass_similarity_threshold & pass_modality_presence,
+    
+    edge_weight_if_established = dplyr::if_else(
+      edge_established,
+      weight_multimodal_bonus,
+      NA_real_
+    ),
+    
+    inferred_reason = dplyr::case_when(
+      !pass_similarity_threshold ~ "Fails total similarity threshold",
+      !pass_modality_presence ~ "Fails modality-presence threshold",
+      TRUE ~ "Passes revised edge rules"
     )
   ) %>%
   dplyr::rowwise() %>%
@@ -1570,6 +2310,7 @@ edges_accounts_to_check <- similarity_values %>%
       n = 15,
       prefix_to_remove = "^text:"
     ),
+    
     top_hashtags = get_top_shared_features(
       X = X_hashtag_aligned,
       source = source,
@@ -1577,13 +2318,15 @@ edges_accounts_to_check <- similarity_values %>%
       n = 15,
       prefix_to_remove = "^hashtag:"
     ),
-    top_urls = get_top_shared_features(
-      X = X_url_aligned,
-      source = source,
-      target = target,
-      n = 10,
-      prefix_to_remove = "^url:"
-    ),
+    
+    # top_urls = get_top_shared_features(
+    #   X = X_url_aligned,
+    #   source = source,
+    #   target = target,
+    #   n = 10,
+    #   prefix_to_remove = "^url:"
+    # ),
+    
     top_domains = get_top_shared_features(
       X = X_domain_aligned,
       source = source,
@@ -1597,71 +2340,108 @@ edges_accounts_to_check <- similarity_values %>%
     source,
     target,
     edge_established,
+    inferred_reason,
+    
     similarity_total,
+    weight_base,
+    multimodal_multiplier,
+    weight_multimodal_bonus,
+    edge_weight_if_established,
+    
     similarity_text,
     similarity_hashtag,
-    similarity_url,
+    # similarity_url,
     similarity_domain,
-    n_active_modalities,
+    
+    active_text,
+    active_hashtag,
+    # active_url,
+    active_domain,
+    n_modalities_above_threshold,
+    n_active_modalities_loose,
+    
+    pass_similarity_threshold,
+    pass_modality_presence,
+    
     max_share,
     text_share,
     hashtag_share,
-    url_share,
+    # url_share,
     domain_share,
     non_domain_similarity,
+    
     top_terms,
     top_hashtags,
-    top_urls,
+    # top_urls,
     top_domains
   ) %>%
   dplyr::arrange(
     dplyr::desc(edge_established),
-    dplyr::desc(similarity_total)
+    dplyr::desc(weight_multimodal_bonus)
   )
 
 edges_accounts_to_check
 ```
 
-
-
 ```{r}
 # -------------------------
-# Inspect one account across modalities
+# Summarize why inspected dyads did or did not receive edges
 # -------------------------
+edges_accounts_to_check %>%
+  dplyr::select(
+    source,
+    target,
+    edge_established,
+    inferred_reason,
+    similarity_total,
+    weight_multimodal_bonus,
+    similarity_text,
+    similarity_hashtag,
+    similarity_domain,
+    active_text,
+    active_hashtag,
+    active_domain,
+    n_modalities_above_threshold,
+    multimodal_multiplier,
+    max_share,
+    text_share,
+    hashtag_share,
+    domain_share
+  )
+```
+
+```{r}
+## Inspect one account across modalities
 account_to_inspect <- "carlosjordyoficial"
 
 top_text <- get_top_features_account(
   mat = X_text_aligned,
   account = account_to_inspect,
-  n = 20
-) %>%
+  n = 20) %>%
   dplyr::mutate(modality = "text")
 
 top_domain <- get_top_features_account(
   mat = X_domain_aligned,
   account = account_to_inspect,
-  n = 20
-) %>%
+  n = 20) %>%
   dplyr::mutate(modality = "domain")
 
-top_url <- get_top_features_account(
-  mat = X_url_aligned,
-  account = account_to_inspect,
-  n = 20
-) %>%
-  dplyr::mutate(modality = "url")
+# top_url <- get_top_features_account(
+#   mat = X_url_aligned,
+#   account = account_to_inspect,
+#   n = 20) %>%
+#   dplyr::mutate(modality = "url")
 
 top_hashtag <- get_top_features_account(
   mat = X_hashtag_aligned,
   account = account_to_inspect,
-  n = 20
-) %>%
+  n = 20) %>%
   dplyr::mutate(modality = "hashtag")
 
 top_features_account <- dplyr::bind_rows(
   top_text,
   top_domain,
-  top_url,
+  # top_url,
   top_hashtag
 ) %>%
   dplyr::select(modality, account, feature_clean, value, feature)
@@ -1671,247 +2451,277 @@ top_features_account
 
 # Network
 ```{r}
+edges_network <- edges_multimodal_practices %>%
+  dplyr::mutate(
+    weight = as.numeric(weight),
+    similarity_total = as.numeric(similarity_total),
+    weight_base = as.numeric(weight_base),
+    multimodal_multiplier = as.numeric(multimodal_multiplier),
+    weight_multimodal_bonus = as.numeric(weight_multimodal_bonus),
+    similarity_text = as.numeric(similarity_text),
+    similarity_hashtag = as.numeric(similarity_hashtag),
+    # similarity_url = as.numeric(similarity_url),
+    similarity_domain = as.numeric(similarity_domain),
+    n_modalities_above_threshold = as.integer(n_modalities_above_threshold),
+    n_active_modalities_loose = as.integer(n_active_modalities_loose)
+  )
+
+
+# -------------------------
+# Vertices
+# -------------------------
 vertices_multimodal <- tibble::tibble(
   author = rownames(S_multimodal_practices)
 ) %>%
-  dplyr::left_join(account_metadata, by = "author")
+  dplyr::left_join(
+    account_metadata,
+    by = "author"
+  ) %>%
+  dplyr::left_join(
+    q_posts_by_author %>%
+      dplyr::select(author, Q1, Q2, Q3, is_wolf),
+    by = "author"
+  ) %>%
+  dplyr::mutate(
+    page_name = dplyr::if_else(
+      is.na(page_name) | page_name == "",
+      author,
+      page_name
+    ),
+    party = dplyr::if_else(
+      is.na(party) | party == "",
+      "NotAvailable",
+      party
+    ),
+    state = dplyr::if_else(
+      is.na(state) | state == "",
+      "NotAvailable",
+      state
+    ),
+    PEC135 = dplyr::if_else(is.na(PEC135), 0L, as.integer(PEC135)),
+    ideology_2021 = as.numeric(ideology_2021),
+    mean_page_followers = tidyr::replace_na(
+      as.numeric(mean_page_followers),
+      0
+    ),
+    total_posts = tidyr::replace_na(as.integer(total_posts), 0L),
+    total_image_posts = tidyr::replace_na(as.integer(total_image_posts), 0L),
+    total_video_posts = tidyr::replace_na(as.integer(total_video_posts), 0L),
+    total_text_posts = tidyr::replace_na(as.integer(total_text_posts), 0L),
+    total_engagement = tidyr::replace_na(as.numeric(total_engagement), 0),
+    mean_engagement = dplyr::if_else(
+      is.na(mean_engagement) | is.nan(mean_engagement),
+      0,
+      as.numeric(mean_engagement)
+    ),
+    Q1 = tidyr::replace_na(as.integer(Q1), 0L),
+    Q2 = tidyr::replace_na(as.integer(Q2), 0L),
+    Q3 = tidyr::replace_na(as.integer(Q3), 0L),
+    is_wolf = tidyr::replace_na(as.integer(is_wolf), 0L)
+  )
+
+
+# -------------------------
+# Weighted graph
+# -------------------------
+# The graph weight is now the multimodality-adjusted tie strength:
+# weight = similarity_total * n_modalities_above_threshold.
+#
+# similarity_total remains available as the raw unweighted multimodal
+# cosine-style score.
 
 g_multimodal_practices <- igraph::graph_from_data_frame(
-  d = edges_multimodal_practices,
+  d = edges_network,
   vertices = vertices_multimodal,
   directed = FALSE
 )
 
+g_multimodal_practices <- igraph::simplify(
+  g_multimodal_practices,
+  remove.multiple = TRUE,
+  remove.loops = TRUE,
+  edge.attr.comb = list(
+    weight = "mean",
+    similarity_total = "mean",
+    weight_base = "mean",
+    multimodal_multiplier = "mean",
+    weight_multimodal_bonus = "mean",
+    
+    similarity_text = "mean",
+    similarity_hashtag = "mean",
+    # similarity_url = "mean",
+    similarity_domain = "mean",
+    
+    active_text = "first",
+    active_hashtag = "first",
+    # active_url = "first",
+    active_domain = "first",
+    n_modalities_above_threshold = "mean",
+    n_active_modalities_loose = "mean",
+    
+    text_share = "mean",
+    hashtag_share = "mean",
+    # url_share = "mean",
+    domain_share = "mean",
+    max_share = "mean",
+    non_domain_similarity = "mean",
+    
+    "ignore"
+  )
+)
+
+
+# -------------------------
+# Network summary
+# -------------------------
 component_summary <- igraph::components(g_multimodal_practices)
 
+edge_weights <- igraph::E(g_multimodal_practices)$weight
+edge_similarity_total <- igraph::E(g_multimodal_practices)$similarity_total
+edge_multipliers <- igraph::E(g_multimodal_practices)$multimodal_multiplier
+
 network_summary <- tibble::tibble(
-  threshold = similarity_threshold,
-  min_modality_share = min_modality_share,
-  max_modality_share = max_modality_share,
-  min_active_modalities = min_active_modalities,
+  similarity_threshold = similarity_threshold,
+  modality_presence_threshold = modality_presence_threshold,
   n_nodes = igraph::vcount(g_multimodal_practices),
   n_edges = igraph::ecount(g_multimodal_practices),
   density = igraph::edge_density(g_multimodal_practices),
   n_isolates = sum(igraph::degree(g_multimodal_practices) == 0),
   n_components = component_summary$no,
   largest_component_size = max(component_summary$csize),
-  largest_component_share = max(component_summary$csize) / igraph::vcount(g_multimodal_practices)
+  largest_component_share =
+    max(component_summary$csize) / igraph::vcount(g_multimodal_practices),
+  mean_degree = mean(igraph::degree(g_multimodal_practices)),
+  median_degree = median(igraph::degree(g_multimodal_practices)),
+  max_degree = max(igraph::degree(g_multimodal_practices)),
+  
+  # Raw similarity among retained edges.
+  mean_similarity_total = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    mean(edge_similarity_total, na.rm = TRUE),
+    NA_real_
+  ),
+  median_similarity_total = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    median(edge_similarity_total, na.rm = TRUE),
+    NA_real_
+  ),
+  
+  # Multimodality-adjusted edge weight.
+  mean_weight = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    mean(edge_weights, na.rm = TRUE),
+    NA_real_
+  ),
+  median_weight = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    median(edge_weights, na.rm = TRUE),
+    NA_real_
+  ),
+  
+  # How multimodal the retained edge set is.
+  mean_multimodal_multiplier = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    mean(edge_multipliers, na.rm = TRUE),
+    NA_real_
+  ),
+  median_multimodal_multiplier = ifelse(
+    igraph::ecount(g_multimodal_practices) > 0,
+    median(edge_multipliers, na.rm = TRUE),
+    NA_real_
+  ),
+  
+  mean_strength = mean(
+    igraph::strength(
+      g_multimodal_practices,
+      weights = edge_weights
+    )
+  ),
+  median_strength = median(
+    igraph::strength(
+      g_multimodal_practices,
+      weights = edge_weights
+    )
+  )
 )
 
 network_summary
 ```
+
 ```{r}
-# -------------------------
-# Network visualization with Louvain communities
-# -------------------------
-# Graph is undirected
-g_plot <- igraph::as_undirected(
-  g_multimodal_practices,
-  mode = "collapse",
-  edge.attr.comb = list(weight = "mean", "ignore")
-)
+# Weighted Louvain community detection
+# ============================================================
 
-# Remove self-loops and duplicate edges if any
-g_plot <- igraph::simplify(
-  g_plot,
-  remove.multiple = TRUE,
-  remove.loops = TRUE,
-  edge.attr.comb = list(weight = "mean", "ignore")
-)
+# Louvain uses the revised graph weight:
+# weight = multimodality-adjusted tie strength.
+# This means that communities are shaped not only by similarity_total,
+# but also by whether similarity is supported across multiple modalities.
 
-# Louvain community detection
 set.seed(999)
+
 louvain_comm <- igraph::cluster_louvain(
-  g_plot,
-  weights = igraph::E(g_plot)$weight
+  g_multimodal_practices,
+  weights = igraph::E(g_multimodal_practices)$weight
 )
 
-# Add community membership to nodes
-igraph::V(g_plot)$louvain_community <- as.integer(
+igraph::V(g_multimodal_practices)$louvain_community <- as.integer(
   igraph::membership(louvain_comm)
 )
 
-igraph::V(g_plot)$community <- as.factor(
-  igraph::V(g_plot)$louvain_community
+igraph::V(g_multimodal_practices)$community <- as.factor(
+  igraph::V(g_multimodal_practices)$louvain_community
 )
 
-# Add basic centrality measures
-igraph::V(g_plot)$degree <- igraph::degree(g_plot)
-
-igraph::V(g_plot)$strength <- igraph::strength(
-  g_plot,
-  weights = igraph::E(g_plot)$weight
+igraph::V(g_multimodal_practices)$degree <- igraph::degree(
+  g_multimodal_practices
 )
 
-# Dataset with node breakdown and Louvain community
-nodes_breakdown <- tibble::tibble(
-  author = igraph::V(g_plot)$name,
-  louvain_community = igraph::V(g_plot)$louvain_community,
-  degree = igraph::V(g_plot)$degree,
-  strength = igraph::V(g_plot)$strength
-) %>%
-  dplyr::left_join(
-    account_metadata,
-    by = "author"
-  ) %>%
-  dplyr::select(
-    author,
-    page_name,
-    party,
-    state,
-    PEC135,
-    ideology_2021,
-    louvain_community,
-    degree,
-    strength,
-    total_posts,
-    total_engagement,
-    mean_engagement
-  ) %>%
-  dplyr::arrange(
-    louvain_community,
-    dplyr::desc(strength)
-  )
+igraph::V(g_multimodal_practices)$strength <- igraph::strength(
+  g_multimodal_practices,
+  weights = igraph::E(g_multimodal_practices)$weight
+)
 
-# Inspect community sizes
-community_sizes <- nodes_breakdown %>%
-  dplyr::count(louvain_community, name = "n_accounts") %>%
-  dplyr::arrange(dplyr::desc(n_accounts))
+modularity_louvain <- igraph::modularity(
+  g_multimodal_practices,
+  membership = igraph::membership(louvain_comm),
+  weights = igraph::E(g_multimodal_practices)$weight
+)
 
-# Inspect
-dplyr::glimpse(nodes_breakdown)
-
-community_sizes
-
-# Modularity
-igraph::modularity(louvain_comm)
+modularity_louvain
 ```
 
-###Community breakdown
+### Nodes breakdown
+
 ```{r}
-# -------------------------
-# Network visualization with Louvain communities
-# -------------------------
-# Graph is undirected
-g_plot <- igraph::as.undirected(
-  g_multimodal_practices,
-  mode = "collapse",
-  edge.attr.comb = list(weight = "mean", "ignore")
-)
-
-# Remove self-loops and duplicate edges if any
-g_plot <- igraph::simplify(
-  g_plot,
-  remove.multiple = TRUE,
-  remove.loops = TRUE,
-  edge.attr.comb = list(weight = "mean", "ignore")
-)
-
-# -------------------------
-# Louvain community detection
-# -------------------------
-
-louvain_comm <- igraph::cluster_louvain(
-  g_plot,
-  weights = igraph::E(g_plot)$weight
-)
-
-igraph::V(g_plot)$louvain_community <- as.integer(
-  igraph::membership(louvain_comm)
-)
-
-igraph::V(g_plot)$community <- as.factor(
-  igraph::V(g_plot)$louvain_community
-)
-
-# -------------------------
-# Centrality measures
-# -------------------------
-
-igraph::V(g_plot)$degree <- igraph::degree(g_plot)
-
-igraph::V(g_plot)$strength <- igraph::strength(
-  g_plot,
-  weights = igraph::E(g_plot)$weight
-)
-
-# -------------------------
-# Account-level metadata
-# -------------------------
-account_metadata_louvain <- df_fb_election %>%
-  dplyr::mutate(
-    author = as.character(author),
-    page_name = as.character(page_name),
-    party = as.character(party),
-    state = as.character(state),
-    PEC135 = as.integer(PEC135),
-    ideology_2021 = as.numeric(ideology_2021),
-    engagement = as.numeric(engagement),
-    Q1 = as.integer(Q1),
-    Q2 = as.integer(Q2),
-    Q3 = as.integer(Q3)
-  ) %>%
-  dplyr::group_by(author) %>%
-  dplyr::summarise(
-    page_name = dplyr::first(stats::na.omit(page_name)),
-    party = dplyr::first(stats::na.omit(party)),
-    state = dplyr::first(stats::na.omit(state)),
-    PEC135 = dplyr::first(stats::na.omit(PEC135)),
-    ideology_2021 = dplyr::first(stats::na.omit(ideology_2021)),
-    total_posts = dplyr::n(),
-    total_engagement = sum(engagement, na.rm = TRUE),
-    mean_engagement = mean(engagement, na.rm = TRUE),
-    Q1 = sum(Q1 == 1, na.rm = TRUE),
-    Q2 = sum(Q2 == 1, na.rm = TRUE),
-    Q3 = sum(Q3 == 1, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  dplyr::mutate(
-    page_name = dplyr::if_else(
-      is.na(page_name) | page_name == "",
-      author,
-      page_name
-    ),
-    party = dplyr::if_else(
-      is.na(party) | party == "",
-      "NotAvailable",
-      party
-    ),
-    state = dplyr::if_else(
-      is.na(state) | state == "",
-      "NotAvailable",
-      state
-    ),
-    PEC135 = dplyr::if_else(is.na(PEC135), 0L, PEC135),
-    mean_engagement = dplyr::if_else(
-      is.na(mean_engagement) | is.nan(mean_engagement),
-      0,
-      mean_engagement
-    ),
-    is_wolf = dplyr::case_when(
-      Q2 >= 10 & PEC135 == 1 ~ 1L,
-      TRUE ~ 0L
-    )
-  )
-
-# -------------------------
-# Node-level dataset
-# -------------------------
+# degree = number of edges incident to each account.
+# strength = sum of multimodality-adjusted edge weights incident to each account.
 nodes_breakdown <- tibble::tibble(
-  author = igraph::V(g_plot)$name,
-  louvain_community = igraph::V(g_plot)$louvain_community,
-  degree = igraph::V(g_plot)$degree,
-  strength = igraph::V(g_plot)$strength
+  author = igraph::V(g_multimodal_practices)$name,
+  label = igraph::V(g_multimodal_practices)$page_name,
+  party = igraph::V(g_multimodal_practices)$party,
+  state = igraph::V(g_multimodal_practices)$state,
+  PEC135 = igraph::V(g_multimodal_practices)$PEC135,
+  ideology_2021 = igraph::V(g_multimodal_practices)$ideology_2021,
+  mean_page_followers = igraph::V(g_multimodal_practices)$mean_page_followers,
+  louvain_community = igraph::V(g_multimodal_practices)$louvain_community,
+  degree = igraph::V(g_multimodal_practices)$degree,
+  strength = igraph::V(g_multimodal_practices)$strength,
+  total_posts = igraph::V(g_multimodal_practices)$total_posts,
+  total_image_posts = igraph::V(g_multimodal_practices)$total_image_posts,
+  total_video_posts = igraph::V(g_multimodal_practices)$total_video_posts,
+  total_text_posts = igraph::V(g_multimodal_practices)$total_text_posts,
+  total_engagement = igraph::V(g_multimodal_practices)$total_engagement,
+  mean_engagement = igraph::V(g_multimodal_practices)$mean_engagement,
+  Q1 = igraph::V(g_multimodal_practices)$Q1,
+  Q2 = igraph::V(g_multimodal_practices)$Q2,
+  Q3 = igraph::V(g_multimodal_practices)$Q3,
+  is_wolf = igraph::V(g_multimodal_practices)$is_wolf
 ) %>%
-  dplyr::left_join(
-    account_metadata_louvain,
-    by = "author"
-  ) %>%
   dplyr::mutate(
-    page_name = dplyr::if_else(
-      is.na(page_name) | page_name == "",
+    label = dplyr::if_else(
+      is.na(label) | label == "",
       author,
-      page_name
+      label
     ),
     party = dplyr::if_else(
       is.na(party) | party == "",
@@ -1923,165 +2733,97 @@ nodes_breakdown <- tibble::tibble(
       "NotAvailable",
       state
     ),
-    PEC135 = dplyr::if_else(is.na(PEC135), 0L, PEC135),
+    PEC135 = dplyr::if_else(is.na(PEC135), 0L, as.integer(PEC135)),
     ideology_2021 = as.numeric(ideology_2021),
-    degree = dplyr::if_else(is.na(degree), 0, as.numeric(degree)),
-    strength = dplyr::if_else(is.na(strength), 0, as.numeric(strength)),
-    total_posts = dplyr::if_else(
-      is.na(total_posts),
-      0L,
-      as.integer(total_posts)
+    mean_page_followers = tidyr::replace_na(
+      as.numeric(mean_page_followers),
+      0
     ),
-    total_engagement = dplyr::if_else(
-      is.na(total_engagement),
-      0,
-      as.numeric(total_engagement)
-    ),
+    degree = tidyr::replace_na(as.numeric(degree), 0),
+    strength = tidyr::replace_na(as.numeric(strength), 0),
+    total_posts = tidyr::replace_na(as.integer(total_posts), 0L),
+    total_image_posts = tidyr::replace_na(as.integer(total_image_posts), 0L),
+    total_video_posts = tidyr::replace_na(as.integer(total_video_posts), 0L),
+    total_text_posts = tidyr::replace_na(as.integer(total_text_posts), 0L),
+    total_engagement = tidyr::replace_na(as.numeric(total_engagement), 0),
     mean_engagement = dplyr::if_else(
       is.na(mean_engagement) | is.nan(mean_engagement),
       0,
       as.numeric(mean_engagement)
     ),
-    Q1 = dplyr::if_else(is.na(Q1), 0L, as.integer(Q1)),
-    Q2 = dplyr::if_else(is.na(Q2), 0L, as.integer(Q2)),
-    Q3 = dplyr::if_else(is.na(Q3), 0L, as.integer(Q3)),
-    is_wolf = dplyr::case_when(
-      Q2 >= 10 & PEC135 == 1 ~ 1L,
-      TRUE ~ 0L
-    )
-  ) %>%
-  dplyr::select(
-    author,
-    label = page_name,
-    party,
-    state,
-    PEC135,
-    ideology_2021,
-    louvain_community,
-    degree,
-    strength,
-    total_posts,
-    total_engagement,
-    mean_engagement,
-    Q1,
-    Q2,
-    Q3,
-    is_wolf
+    Q1 = tidyr::replace_na(as.integer(Q1), 0L),
+    Q2 = tidyr::replace_na(as.integer(Q2), 0L),
+    Q3 = tidyr::replace_na(as.integer(Q3), 0L),
+    is_wolf = tidyr::replace_na(as.integer(is_wolf), 0L)
   ) %>%
   dplyr::arrange(
     louvain_community,
     dplyr::desc(strength)
   )
 
-# -------------------------
-# Community sizes
-# -------------------------
+# Inspect
+dplyr::glimpse(nodes_breakdown)
+```
 
+###Community breakdown
+```{r}
+# -------------------------
+# Helper functions
+# -------------------------
+collapse_top_features <- function(x, n = 15) {
+  x %>%
+    stringr::str_remove("^(domain|hashtag|text):") %>%
+    unique() %>%
+    head(n) %>%
+    paste(collapse = "; ")
+}
+
+get_top_matrix_features <- function(X, members, n = 15) {
+  
+  members_present <- intersect(members, rownames(X))
+  
+  if (length(members_present) == 0) {
+    return(NA_character_)
+  }
+  
+  feature_scores <- Matrix::colSums(
+    X[members_present, , drop = FALSE]
+  )
+  
+  if (length(feature_scores) == 0 || all(feature_scores == 0)) {
+    return(NA_character_)
+  }
+  
+  names(feature_scores) <- colnames(X)
+  
+  names(sort(feature_scores, decreasing = TRUE)) %>%
+    collapse_top_features(n = n)
+}
+
+get_total_matrix_weight <- function(X, members) {
+  
+  members_present <- intersect(members, rownames(X))
+  
+  if (length(members_present) == 0) {
+    return(0)
+  }
+  
+  sum(X[members_present, , drop = FALSE])
+}
+```
+
+
+```{r}
+# ============================================================
+# Community sizes
+# ============================================================
 community_sizes <- nodes_breakdown %>%
   dplyr::count(louvain_community, name = "n_accounts") %>%
   dplyr::arrange(dplyr::desc(n_accounts))
 
-# -------------------------
-# Modularity
-# -------------------------
-
-modularity_louvain <- igraph::modularity(louvain_comm)
-
-# Inspect
-dplyr::glimpse(nodes_breakdown)
-community_sizes
-modularity_louvain
-```
-
-#### Gephi
-```{r}
-# -------------------------
-# Nodes for Gephi
-# -------------------------
-nodes_gephi <- nodes_breakdown %>%
-  dplyr::transmute(
-    Id = as.character(author),
-    Label = as.character(label),
-    author = as.character(author),
-    party = as.character(party),
-    state = as.character(state),
-    PEC135 = as.integer(PEC135),
-    ideology_2021 = as.numeric(ideology_2021),
-    louvain_community = as.integer(louvain_community),
-    degree = as.numeric(degree),
-    strength = as.numeric(strength),
-    total_posts = as.integer(total_posts),
-    total_engagement = as.numeric(total_engagement),
-    mean_engagement = as.numeric(mean_engagement),
-    Q1 = as.integer(Q1),
-    Q2 = as.integer(Q2),
-    is_wolf = as.integer(is_wolf)
-  ) %>%
-  dplyr::filter(!is.na(Id), Id != "") %>%
-  dplyr::distinct(Id, .keep_all = TRUE)
-
-
-# Edges
-edges_gephi <- edges_multimodal_practices %>%
-  dplyr::transmute(
-    Source = as.character(source),
-    Target = as.character(target),
-    Type = "Undirected",
-    Weight = as.numeric(similarity_total),
-    similarity_text = as.numeric(similarity_text),
-    similarity_hashtag = as.numeric(similarity_hashtag),
-    similarity_url = as.numeric(similarity_url),
-    similarity_domain = as.numeric(similarity_domain),
-    share_text = as.numeric(text_share),
-    share_hashtag = as.numeric(hashtag_share),
-    share_url = as.numeric(url_share),
-    share_domain = as.numeric(domain_share),
-    n_active_modalities = as.integer(n_active_modalities),
-    max_share = as.numeric(max_share)
-  ) %>%
-  dplyr::filter(
-    !is.na(Source), Source != "",
-    !is.na(Target), Target != "",
-    !is.na(Weight)
-  )
-```
-
-# Wolves?
-```{r}
-df_fb_GPT <- readr::read_rds(
-  here::here("_processed_data", "election_dataset.rds")
-)
-
-q_posts_by_author <- df_fb_GPT %>%
-  dplyr::group_by(author) %>%
-  dplyr::summarise(
-    Q1_posts = sum(Q1 == 1, na.rm = TRUE),
-    Q2_posts = sum(Q2 == 1, na.rm = TRUE),
-    Q3_posts = sum(Q3 == 1, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-community_q_posts <- nodes_breakdown %>%
-  dplyr::select(author, louvain_community) %>%
-  dplyr::left_join(
-    q_posts_by_author,
-    by = "author"
-  ) %>%
-  dplyr::mutate(
-    Q1_posts = tidyr::replace_na(Q1_posts, 0),
-    Q2_posts = tidyr::replace_na(Q2_posts, 0),
-    Q3_posts = tidyr::replace_na(Q3_posts, 0)
-  ) %>%
-  dplyr::group_by(louvain_community) %>%
-  dplyr::summarise(
-    Q1_posts = sum(Q1_posts, na.rm = TRUE),
-    Q2_posts = sum(Q2_posts, na.rm = TRUE),
-    Q3_posts = sum(Q3_posts, na.rm = TRUE),
-    .groups = "drop"
-  )
-```
-
-```{r}
+# ============================================================
+# Community breakdown
+# ============================================================
 community_breakdown <- nodes_breakdown %>%
   dplyr::group_by(louvain_community) %>%
   dplyr::summarise(
@@ -2121,19 +2863,19 @@ community_breakdown <- nodes_breakdown %>%
       X = X_hashtag_aligned,
       members = members
     ),
-    top_urls = get_top_matrix_features(
-      X = X_url_aligned,
-      members = members,
-      n = 15
-    ),
-    n_urls = get_total_matrix_weight(
-      X = X_url_aligned,
-      members = members
-    ),
+    # top_urls = get_top_matrix_features(
+    #   X = X_url_aligned,
+    #   members = members,
+    #   n = 15
+    # ),
+    # n_urls = get_total_matrix_weight(
+    #   X = X_url_aligned,
+    #   members = members
+    # ),
     top_terms = get_top_matrix_features(
       X = X_text_aligned,
       members = members,
-      n = 20
+      n = 40
     )
   ) %>%
   dplyr::ungroup() %>%
@@ -2148,8 +2890,8 @@ community_breakdown <- nodes_breakdown %>%
     n_domains,
     top_hashtags,
     n_hashtags,
-    top_urls,
-    n_urls,
+    # top_urls,
+    # n_urls,
     top_terms,
     n_posts,
     total_engagement,
@@ -2157,42 +2899,116 @@ community_breakdown <- nodes_breakdown %>%
   ) %>%
   dplyr::arrange(community_number)
 
+community_sizes
 community_breakdown
 ```
 
+#### Gephi
 ```{r}
-# ============================================================
-# Extract Q2 posts from a specific community
-# ============================================================
-# Identify authors in Louvain community
-community_X_authors <- nodes_breakdown %>%
-  dplyr::filter(louvain_community == 4) %>%
-  dplyr::pull(author)
+# Nodes and edges exported for Gephi.
+# Edge Weight is now the multimodality-adjusted tie strength:
+#   Weight = similarity_total * multimodal_multiplier
+# similarity_total is the raw unweighted multimodal similarity.
+# multimodal_multiplier indicates how many modalities exceeded the
+# modality-specific threshold.
 
-# Extract Q2 posts by those authors
-q2_posts_community_X <- df_fb_GPT %>%
-  dplyr::filter(
-    author %in% community_X_authors,
-    Q2 == 1
-  )
+# -------------------------
+# Nodes
+# -------------------------
+nodes_gephi <- nodes_breakdown %>%
+  dplyr::transmute(
+    Id = as.character(author),
+    Label = as.character(label),
+    author = as.character(author),
+    party = as.character(party),
+    state = as.character(state),
+    PEC135 = as.integer(PEC135),
+    ideology_2021 = as.numeric(ideology_2021),
+    mean_page_followers = as.numeric(mean_page_followers),
+    louvain_community = as.integer(louvain_community),
 
-# Inspect
-q2_posts_community_X %>%
-  dplyr::select(
-    author,
-    dplyr::any_of(c(
-      "page_name",
-      "timestamp",
-      "message",
-      "text",
-      "body",
-      "Q1",
-      "Q2",
-      "Q3"
-    ))
+    # Network position
+    degree = as.numeric(degree),
+
+    # Strength is based on the revised multimodality-adjusted edge weight.
+    strength = as.numeric(strength),
+
+    # Activity and engagement
+    total_posts = as.integer(total_posts),
+    total_image_posts = as.integer(total_image_posts),
+    total_video_posts = as.integer(total_video_posts),
+    total_text_posts = as.integer(total_text_posts),
+    total_engagement = as.numeric(total_engagement),
+    mean_engagement = as.numeric(mean_engagement),
+
+    # Case-study variables
+    Q1 = as.integer(Q1),
+    Q2 = as.integer(Q2),
+    Q3 = as.integer(Q3),
+    is_wolf = as.integer(is_wolf)
   ) %>%
-  dplyr::glimpse()
+  dplyr::filter(
+    !is.na(Id),
+    Id != ""
+  ) %>%
+  dplyr::distinct(Id, .keep_all = TRUE)
+
+
+# -------------------------
+# Edges
+# -------------------------
+
+edges_gephi <- edges_network %>%
+  dplyr::transmute(
+    Source = as.character(source),
+    Target = as.character(target),
+    Type = "Undirected",
+
+    # Final edge weight used in the network.
+    # This is the multimodality-adjusted tie strength.
+    Weight = as.numeric(weight),
+
+    # Raw unweighted multimodal similarity.
+    similarity_total = as.numeric(similarity_total),
+
+    # Weight diagnostics.
+    weight_base = as.numeric(weight_base),
+    multimodal_multiplier = as.numeric(multimodal_multiplier),
+    weight_multimodal_bonus = as.numeric(weight_multimodal_bonus),
+
+    # Modality-specific cosine similarities.
+    similarity_text = as.numeric(similarity_text),
+    similarity_hashtag = as.numeric(similarity_hashtag),
+    # similarity_url = as.numeric(similarity_url),
+    similarity_domain = as.numeric(similarity_domain),
+
+    # Whether each modality exceeded the modality-presence threshold.
+    active_text = as.integer(active_text),
+    active_hashtag = as.integer(active_hashtag),
+    # active_url = as.integer(active_url),
+    active_domain = as.integer(active_domain),
+
+    # Number of modalities above the modality-presence threshold.
+    n_modalities_above_threshold = as.integer(n_modalities_above_threshold),
+
+    # Share diagnostics.
+    # These are retained for auditing but no longer determine edge inclusion.
+    share_text = as.numeric(text_share),
+    share_hashtag = as.numeric(hashtag_share),
+    # share_url = as.numeric(url_share),
+    share_domain = as.numeric(domain_share),
+    max_share = as.numeric(max_share),
+
+    # Diagnostic similarity excluding domains.
+    non_domain_similarity = as.numeric(non_domain_similarity)
+  ) %>%
+  dplyr::filter(
+    !is.na(Source), Source != "",
+    !is.na(Target), Target != "",
+    !is.na(Weight)
+  )
 ```
+
 #### Export
 ```{r}
 # -------------------------
@@ -2201,35 +3017,29 @@ q2_posts_community_X %>%
 readr::write_tsv(
   nodes_gephi,
   here::here("_processed_data", "gephi_nodes_multimodal_practices.tsv"),
-  na = ""
-)
+  na = "")
 
 readr::write_tsv(
   edges_gephi,
   here::here("_processed_data", "gephi_edges_multimodal_practices.tsv"),
-  na = ""
-)
+  na = "")
 
 # -------------------------
 # Export other objects
 # -------------------------
 readr::write_rds(
   edges_multimodal_practices,
-  "_processed_data/edges_multimodal_practices_threshold.rds"
-)
+  here::here("_processed_data", "edges_multimodal_practices_threshold.rds"))
 
 readr::write_csv(
   edges_multimodal_practices,
-  "_processed_data/edges_multimodal_practices_threshold.csv"
-)
+  here::here("_processed_data", "edges_multimodal_practices_threshold.csv"))
 
 readr::write_csv(
   community_breakdown,
-  "_processed_data/community_breakdown.csv"
-)
+  here::here("_processed_data", "community_breakdown.csv"))
 
 readr::write_csv(
   nodes_breakdown,
-  "_processed_data/nodes_breakdown.csv"
-)
+  here::here("_processed_data", "nodes_breakdown.csv"))
 ```
