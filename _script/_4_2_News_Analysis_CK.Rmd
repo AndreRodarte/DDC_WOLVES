@@ -56,6 +56,47 @@ Before any statistical modeling, we must transform the wide sharing matrix into 
 
 We apply an automated filter to remove active parliamentarians and a hardcoded list to remove URL shorteners, party handles, and mismatched legacy URLs.
 
+```{r domain ideology}
+# 1. Convert the wide matrix into a long dataframe
+domain_long <- account_by_media_domain_counts %>%
+  as.data.frame() %>%
+  # Move the row names (the account handles) into a proper column
+  rownames_to_column(var = "author") %>%
+  # Pivot all domain columns into two columns: 'domain' and 'share_count'
+  pivot_longer(
+    cols = -author, 
+    names_to = "domain", 
+    values_to = "share_count"
+  ) %>%
+  # Filter out the zeroes immediately to save memory and processing time
+  filter(share_count > 0)
+
+# 2. Merge with legislator data and calculate ideological metrics
+domain_ideology_summary <- domain_long %>%
+  # Join only the necessary columns from nodes_breakdown
+  inner_join(
+    nodes_breakdown %>% select(author, party, ideology_2021), 
+    by = "author"
+  ) %>%
+  group_by(domain) %>%
+  summarise(
+    total_shares = sum(share_count, na.rm = TRUE),
+    
+    # Weighted Mean
+    weighted_mean_ideology = sum(share_count * ideology_2021, na.rm = TRUE) / total_shares,
+    
+    # Weighted Variance and Standard Deviation
+    weighted_variance = sum(share_count * (ideology_2021 - weighted_mean_ideology)^2, na.rm = TRUE) / total_shares,
+    weighted_sd_ideology = sqrt(weighted_variance),
+    
+    .groups = "drop"
+  ) %>%
+  # Filter out low-frequency domains to avoid artificial 0 standard deviations
+  filter(total_shares >= 10) %>%
+  # Sort by total shares descending for readability
+  arrange(desc(total_shares))
+```
+
 ```{r}
 # 1. Define the dynamic exclusion list from known authors (lowercased for strict matching)
 politician_handles <- tolower(unique(nodes_breakdown$author))
@@ -114,6 +155,9 @@ domain_ideology_summary <- domain_long_clean %>%
 We visualize this distribution, utilizing horizontal jitter to expose density and highlighting domains with low standard deviation (high exclusivity).
 
 ```{r}
+library(ggplot2)
+library(ggrepel)
+
 # Filter out low-N noise to prevent false variance signals
 filtered_summary <- domain_ideology_summary %>%
   filter(total_shares >= 50)
@@ -122,18 +166,17 @@ filtered_summary <- domain_ideology_summary %>%
 top_domains <- filtered_summary %>%
   slice_max(order_by = total_shares, n = 50)
 
-ggplot(filtered_summary, aes(x = weighted_mean_ideology, y = total_shares)) +
+plot_1d_baseline <- ggplot(filtered_summary, aes(x = weighted_mean_ideology, y = total_shares)) +
   
-  # Add slight horizontal jitter to expose density
-  geom_jitter(
+  # Use position_jitter with a strict seed for reproducible point placement
+  geom_point(
     aes(color = weighted_sd_ideology), 
-    width = 0.03, height = 0, 
+    position = position_jitter(width = 0.03, height = 0, seed = 42),
     alpha = 0.8, size = 2.5
   ) +
   scale_y_log10(labels = scales::comma) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   
-  # Apply labels only to the isolated top dataframe
   geom_text_repel(
     data = top_domains,
     aes(label = domain),
@@ -160,8 +203,13 @@ ggplot(filtered_summary, aes(x = weighted_mean_ideology, y = total_shares)) +
     plot.title = element_text(face = "bold"),
     plot.subtitle = element_text(color = "gray30", margin = margin(b = 10)),
     legend.position = "right",
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA) # Ensure non-transparent background
   )
+
+# Export in high definition
+ggsave("figure1_domain_ideology_baseline.png", plot = plot_1d_baseline, width = 10, height = 7, dpi = 300)
+print(plot_1d_baseline)
 ```
 
 ## 4. The Right-Wing Split: Attention Share & Media Diet Space
@@ -209,7 +257,7 @@ Final Visualization: The Two-Tiered Media Landscape
 We plot the media diet space, rendering the domains as points colored by their underlying ideological score and adjusted for transparency based on exclusivity.
 
 ```{r}
-ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) +
+plot_diet_space <- ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) +
   
   # 45-degree identity line (Equal structural attention)
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray60") +
@@ -230,13 +278,13 @@ ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) 
   scale_alpha_continuous(name = "Domain Exclusivity\n(1 - SD)", range = c(0.4, 1)) +
   scale_size_continuous(name = "Total Combined Shares", labels = scales::comma) +
   
-  # Strict label filtering to prevent clutter in the low-volume tail
   geom_text_repel(
     data = media_diet_enriched %>% filter(diet_ratio > 3.5 | diet_ratio < 0.25 | total_volume > 1500),
     aes(label = domain),
     size = 3.5,
     box.padding = 0.4,
-    max.overlaps = 25
+    max.overlaps = 25,
+    seed = 42 # Reproducible label placement
   ) +
   
   labs(
@@ -249,8 +297,13 @@ ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) 
   theme(
     plot.title = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    plot.background = element_rect(fill = "white", color = NA)
   )
+
+# Export in high definition
+ggsave("figure2_rightwing_diet_split.png", plot = plot_diet_space, width = 11, height = 8, dpi = 300)
+print(plot_diet_space)
 ```
 
 ### Analytical Interpretation
@@ -314,6 +367,31 @@ knitr::kable(
   format.args = list(big.mark = ",")
 )
 ```
+
+```{r}
+# ==============================================================================
+# APPENDIX TABLE: Distribution of Media Profiles
+# ==============================================================================
+
+# Generate a summary table of the ecosystem architecture
+typology_summary <- domain_typologies %>%
+  group_by(media_profile) %>%
+  summarise(
+    domain_count = n(),
+    total_shares_in_profile = sum(total_shares),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_shares_in_profile))
+
+# Print the summary table for the RMarkdown output
+knitr::kable(
+  typology_summary, 
+  caption = "Distribution of Media Profiles across the Information Ecosystem",
+  format.args = list(big.mark = ",")
+)
+```
+
+
 
 ### Structural Asymmetry: The Absence of a Cross-Partisan Right
 
@@ -661,6 +739,68 @@ ggplot(temporal_denialism, aes(x = post_week, y = denialist_volume, color = broa
     legend.position = "bottom"
   )
 ```
+
+```{r}
+# ==============================================================================
+# APPENDIX FIGURES: Multi-Modal Classification of Election Denialism
+# ==============================================================================
+library(ggplot2)
+library(scales)
+
+# 1. Descriptive Probability Bar Chart
+plot_denialism_bar <- ggplot(denialism_by_profile, aes(x = reorder(media_profile, pct_true_denial), y = pct_true_denial)) +
+  geom_col(aes(fill = grepl("Right \\| Exclusive", media_profile)), alpha = 0.9) +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "darkred", "FALSE" = "gray70")) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  labs(
+    title = "Alternative Media as Vectors of Attacks on Election Integrity",
+    subtitle = "Percentage of posts flagged for Textual Skepticism + PEC135 Support.",
+    x = NULL,
+    y = "Probability of Post Containing Election Undermining Content",
+    fill = "Far-Right Alternative Ecosystem"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "none",
+    plot.background = element_rect(fill = "white", color = NA) # Ensures printable background
+  )
+
+# Export Bar Chart
+ggsave("appendix_fig1_denialism_probability.png", plot = plot_denialism_bar, width = 10, height = 6, dpi = 300)
+print(plot_denialism_bar)
+
+
+# 2. Timeline of Discursive Radicalization
+plot_denialism_timeline <- ggplot(temporal_denialism, aes(x = post_week, y = denialist_volume, color = broad_media_type)) +
+  geom_line(linewidth = 1.2) + # Note: using linewidth instead of size for updated ggplot2 standards
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = c(
+    "Far-Right Alternative" = "darkred", 
+    "Mainstream/Centrist" = "gray60", 
+    "Other" = "steelblue"
+  )) +
+  labs(
+    title = "The Timeline of Discursive Radicalization",
+    subtitle = "Weekly volume of denialist posts by PEC135 supporters, categorized by media link.",
+    x = "Timeline",
+    y = "Volume of True Denialist Posts",
+    color = "Linked Media Ecosystem"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    plot.background = element_rect(fill = "white", color = NA) # Ensures printable background
+  )
+
+# Export Timeline
+ggsave("appendix_fig2_denialism_timeline.png", plot = plot_denialism_timeline, width = 10, height = 6, dpi = 300)
+print(plot_denialism_timeline)
+```
+
+
 
 ```{r}
 # ==============================================================================
