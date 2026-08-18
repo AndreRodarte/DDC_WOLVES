@@ -471,6 +471,53 @@ ggsave(
   width = 8, height = 5, dpi = 300)
 ```
 
+## Party descriptions
+```{r}
+# Party Membership
+party_inspection <- nodes_grouped %>%
+  dplyr::group_by(wolf_group) %>%
+  dplyr::summarise(
+    n_parties = dplyr::n_distinct(party, na.rm = TRUE),
+    parties = paste(sort(unique(stats::na.omit(party))), collapse = ", "),
+    .groups = "drop"
+  )
+
+# Party Prevalence
+party_vote_inspection <- nodes_grouped %>%
+  dplyr::group_by(PEC135) %>%
+  dplyr::count(party, name = "n_politicians") %>%
+  dplyr::group_by(party) %>%
+  dplyr::mutate(
+    total_party = sum(n_politicians),
+    percentage = 100 * n_politicians / total_party
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(PEC135, dplyr::desc(percentage))
+
+# Q2 Prevalence
+Liberal_Party_Q2 <- nodes_grouped %>% 
+  dplyr::filter(party == "PL") %>% 
+  dplyr::mutate(
+    Q2_Category = dplyr::case_when(
+      Q2 <  10             ~ "0–9",
+      Q2 >= 10 & Q2 < 19   ~ "10-19",
+      Q2 >= 20 & Q2 < 29   ~ "20-29",
+      Q2 >= 30 & Q2 < 39   ~ "30-39",
+      Q2 >= 40 & Q2 < 49   ~ "40-49",
+      Q2 >= 50             ~ "50+")
+    ) %>% 
+  dplyr::group_by(Q2_Category) %>%
+  dplyr::summarise(PL_members = dplyr::n(), .groups = "drop") %>% 
+  dplyr::mutate(
+    percentage = round(100 * PL_members / sum(PL_members), digits=2)
+    )
+
+    
+Liberal_Party_Q2
+party_inspection
+party_vote_inspection
+```
+
 ## Temporal analysis
 ```{r}
 # Monthly evolution: Q1 counts

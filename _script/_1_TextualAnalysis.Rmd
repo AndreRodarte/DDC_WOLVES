@@ -265,7 +265,7 @@ df_FB_with_PEC135 <- df_FB %>%
   )
 
 # Check
-# 5. Check how many posts received PEC135 information
+# Check how many posts received PEC135 information
 df_FB_with_PEC135 %>%
   dplyr::summarise(
     total_posts = dplyr::n(),

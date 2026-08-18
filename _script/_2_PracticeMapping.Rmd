@@ -29,9 +29,9 @@ library(graphlayouts)
 ```{r}
 # Data
 df_fb <- read_rds(
-  here("..", "_processed_data", "df_fb_GPT.rds"))
+  here("_processed_data", "df_fb_GPT.rds"))
 df_fb_election <- read_rds(
-  here("..", "_processed_data", "df_fb_election.rds"))
+  here("_processed_data", "df_fb_election.rds"))
 # Quick check
 glimpse(df_fb)
 
@@ -813,7 +813,7 @@ domain_aliases <- domain_aliases %>%
 
 # Practice Mapping
 *Steps:*
-*Create matrices* in which every row is a vector representing a specific politician. Conversely, every column is a vector representing a social media activity distribution across all politicians (e.g. hashtag usage). 
+*Create matrices* in which every row is a vector representing a specific politician. Every column is a vector representing a social media activity distribution across all politicians (e.g. hashtag usage). 
 We will use sparse matrix, specifically, as it is a memory-efficient way to store these grids by only remembering the cells that aren't zero.
 
 *Apply TF-IDF (Term Frequency-Inverse Document Frequency)*: This calculation changes the politician vectors so they point toward what makes them unique.
@@ -1549,6 +1549,21 @@ domain_counts_by_source %>%
 ###Inspection
 ```{r}
 table(domain_counts_by_source$source)
+```
+```{r}
+wolves <- nodes_breakdown %>% 
+  filter(is_wolf == 1) %>% 
+  pull(author)
+
+domain_inspection <- domain_long_filtered %>% 
+  filter(feature == "domain:oantagonista", n >= 1) 
+
+# % of wolves who referred to the domain
+mean(wolves %in% domain_inspection$author) * 100
+
+# % of all references to the domain that came from wolves
+sum(domain_inspection$n[domain_inspection$author %in% wolves]) /
+  sum(domain_inspection$n) * 100
 ```
 ## Metadata
 ```{r}
@@ -2770,7 +2785,7 @@ dplyr::glimpse(nodes_breakdown)
 # -------------------------
 # Helper functions
 # -------------------------
-collapse_top_features <- function(x, n = 15) {
+collapse_top_features <- function(x, n = 30) {
   x %>%
     stringr::str_remove("^(domain|hashtag|text):") %>%
     unique() %>%
@@ -2778,7 +2793,7 @@ collapse_top_features <- function(x, n = 15) {
     paste(collapse = "; ")
 }
 
-get_top_matrix_features <- function(X, members, n = 15) {
+get_top_matrix_features <- function(X, members, n = 30) {
   
   members_present <- intersect(members, rownames(X))
   
@@ -2822,86 +2837,276 @@ community_sizes <- nodes_breakdown %>%
   dplyr::arrange(dplyr::desc(n_accounts))
 
 # ============================================================
+# Hashtag info
+# ============================================================
+hashtag_usage_by_author <- hashtag_long_filtered %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    total_hashtags_used = sum(n, na.rm = TRUE),
+    .groups = "drop")
+
+# ============================================================
 # Community breakdown
 # ============================================================
 community_breakdown <- nodes_breakdown %>%
+  
+  # Add raw hashtag-use counts
+  dplyr::left_join(
+    hashtag_usage_by_author,
+    by = "author"
+  ) %>%
+  
+  # Politicians with no hashtags should have 0, not NA
+  dplyr::mutate(
+    total_hashtags_used = dplyr::coalesce(total_hashtags_used, 0L)
+  ) %>%
+  
   dplyr::group_by(louvain_community) %>%
+  
   dplyr::summarise(
     community_number = dplyr::first(louvain_community),
+    
+    # Community composition
     n_members = dplyr::n_distinct(author),
     members = list(author),
+    n_wolves = sum(is_wolf == 1, na.rm = TRUE),
+    
+    # Parties represented
+    parties = paste(
+      sort(unique(stats::na.omit(party))),
+      collapse = "; "
+    ),
+    
+    # Ideology and audience size
+    mean_ideology_score = mean(ideology_2021, na.rm = TRUE),
+    mean_page_followers = mean(mean_page_followers, na.rm = TRUE),
+    
+    # Posting activity
     n_posts = sum(total_posts, na.rm = TRUE),
+    mean_posts_per_politician = mean(total_posts, na.rm = TRUE),
+    
+    # Hashtag activity
+    total_hashtags_used = sum(total_hashtags_used, na.rm = TRUE),
+    mean_hashtags_used = mean(total_hashtags_used, na.rm = TRUE),
+    
+    # Wolf indicators
+    Q1_posts = sum(Q1, na.rm = TRUE),
+    Q2_posts = sum(Q2, na.rm = TRUE),
+    Q3_posts = sum(Q3, na.rm = TRUE),
+    
+    # Engagement
     total_engagement = sum(total_engagement, na.rm = TRUE),
     mean_engagement = dplyr::if_else(
       n_posts > 0,
       total_engagement / n_posts,
       0
     ),
-    Q1_posts = sum(Q1, na.rm = TRUE),
-    Q2_posts = sum(Q2, na.rm = TRUE),
-    Q3_posts = sum(Q3, na.rm = TRUE),
-    n_wolves = sum(is_wolf == 1, na.rm = TRUE),
+    
     .groups = "drop"
   ) %>%
+  
   dplyr::rowwise() %>%
+  
   dplyr::mutate(
+    
     top_domains = get_top_matrix_features(
       X = X_domain_aligned,
       members = members,
-      n = 15
+      n = 20
     ),
+    
     n_domains = get_total_matrix_weight(
       X = X_domain_aligned,
       members = members
     ),
+    
     top_hashtags = get_top_matrix_features(
       X = X_hashtag_aligned,
       members = members,
-      n = 15
+      n = 20
     ),
+    
     n_hashtags = get_total_matrix_weight(
       X = X_hashtag_aligned,
       members = members
     ),
+    
     # top_urls = get_top_matrix_features(
     #   X = X_url_aligned,
     #   members = members,
     #   n = 15
     # ),
+    
     # n_urls = get_total_matrix_weight(
     #   X = X_url_aligned,
     #   members = members
     # ),
+    
     top_terms = get_top_matrix_features(
       X = X_text_aligned,
       members = members,
       n = 40
     )
   ) %>%
+  
   dplyr::ungroup() %>%
+  
   dplyr::select(
     community_number,
     n_members,
     n_wolves,
-    Q1_posts,
-    Q2_posts,
-    Q3_posts,
+    parties,
+    mean_ideology_score,
+    mean_page_followers,
+    n_posts,
+    mean_posts_per_politician,
+    total_hashtags_used,
+    mean_hashtags_used,
+    Q1_posts, Q2_posts, Q3_posts,
     top_domains,
     n_domains,
     top_hashtags,
     n_hashtags,
-    # top_urls,
-    # n_urls,
+    # top_urls, # n_urls,
     top_terms,
-    n_posts,
     total_engagement,
     mean_engagement
-  ) %>%
-  dplyr::arrange(community_number)
+  )
 
+  
 community_sizes
 community_breakdown
 ```
+
+##### Inspection
+```{r}
+community_3 <- nodes_breakdown %>% 
+  filter(louvain_community == 3) %>% 
+  pull(author)
+
+domain_inspection <- domain_long_filtered %>% 
+  filter(feature == "domain:terrabrasilnoticias", n >= 1)
+
+# % of wolves who referred to the domain
+mean(wolves %in% domain_inspection$author) * 100
+
+# % of Community 3's references to the domain that came from wolves
+domain_inspection %>%
+  filter(author %in% community_3) %>%
+  summarise(
+    pct_referrals_from_wolves =
+      sum(n[author %in% wolves]) / sum(n) * 100
+  )
+```
+```{r}
+wolf_hashtags <- hashtag_long_filtered %>% 
+  filter(author %in% wolves, n >= 1) %>% 
+  group_by(feature) %>% 
+  summarise(
+    n_references = sum(n),
+    n_wolves_using = n_distinct(author),
+    pct_wolves_using = n_distinct(author) / length(wolves) * 100,
+    .groups = "drop"
+  ) %>% 
+  arrange(desc(n_references))
+
+wolf_hashtags %>% 
+  slice_head(n = 20)
+```
+
+#### Party Vs. Wolves
+```{r}
+# Add politician attributes to edges
+edges_attributes <- edges_multimodal_practices_threshold %>%
+  dplyr::left_join(
+    nodes_breakdown %>%
+      dplyr::select(author, party, is_wolf),
+    by = c("source" = "author")
+  ) %>%
+  dplyr::rename(
+    source_party = party,
+    source_wolf = is_wolf
+  ) %>%
+  
+  dplyr::left_join(
+    nodes_breakdown %>%
+      dplyr::select(author, party, is_wolf),
+    by = c("target" = "author")
+  ) %>%
+  dplyr::rename(
+    target_party = party,
+    target_wolf = is_wolf
+  )
+
+# PARTY
+party_similarity <- dplyr::bind_rows(
+  
+  # Average within each party
+  edges_attributes %>%
+    dplyr::filter(
+      !is.na(source_party),
+      !is.na(target_party),
+      source_party == target_party
+    ) %>%
+    dplyr::group_by(group = source_party) %>%
+    dplyr::summarise(
+      n_edges = dplyr::n(),
+      mean_similarity = mean(weight_multimodal_bonus, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(mean_similarity)),
+  
+  # Average across different parties
+  edges_attributes %>%
+    dplyr::filter(
+      !is.na(source_party),
+      !is.na(target_party),
+      source_party != target_party
+    ) %>%
+    dplyr::summarise(
+      group = "Across parties",
+      n_edges = dplyr::n(),
+      mean_similarity = mean(weight_multimodal_bonus, na.rm = TRUE)
+    ),
+  
+  # Average across all within-party edges
+  edges_attributes %>%
+    dplyr::filter(
+      !is.na(source_party),
+      !is.na(target_party),
+      source_party == target_party
+    ) %>%
+    dplyr::summarise(
+      group = "All parties",
+      n_edges = dplyr::n(),
+      mean_similarity = mean(weight_multimodal_bonus, na.rm = TRUE)
+    )
+)
+
+#WOLVES
+wolf_similarity <- edges_attributes %>%
+  dplyr::filter(
+    !is.na(source_wolf),
+    !is.na(target_wolf)
+  ) %>%
+  dplyr::mutate(
+    group = dplyr::case_when(
+      source_wolf == 1 & target_wolf == 1 ~ "Wolves",
+      source_wolf == 0 & target_wolf == 0 ~ "Others",
+      TRUE                                ~ "Wolf–Other"
+    )
+  ) %>%
+  dplyr::group_by(group) %>%
+  dplyr::summarise(
+    n_edges = dplyr::n(),
+    mean_similarity = mean(weight_multimodal_bonus, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+wolf_similarity
+party_similarity
+```
+
 
 #### Gephi
 ```{r}
