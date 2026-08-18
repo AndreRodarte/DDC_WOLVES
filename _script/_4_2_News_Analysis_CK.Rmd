@@ -155,9 +155,6 @@ domain_ideology_summary <- domain_long_clean %>%
 We visualize this distribution, utilizing horizontal jitter to expose density and highlighting domains with low standard deviation (high exclusivity).
 
 ```{r}
-library(ggplot2)
-library(ggrepel)
-
 # Filter out low-N noise to prevent false variance signals
 filtered_summary <- domain_ideology_summary %>%
   filter(total_shares >= 50)
@@ -439,9 +436,6 @@ ggplot(typology_summary, aes(axis1 = cat_partisanship,
     panel.grid.minor = element_blank()
   )
 ```
-
-
-
 ```{r}
 # ==============================================================================
 # STEP 7: Factional Diet Composition by Media Typology
