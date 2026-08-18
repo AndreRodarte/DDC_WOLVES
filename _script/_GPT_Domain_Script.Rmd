@@ -1,0 +1,2145 @@
+---
+title: "VotingMachines"
+author: "André K. Rodarte"
+date: "2024-06-04"
+output: html_document
+---
+# Set up
+```{r setup, include=FALSE}
+#install.packages("conText")
+library(tidyverse)
+library(tidytext)
+library(dplyr)
+library(here)
+
+#Text
+library(stopwords)
+library(stringi)
+library(tidyverse) 
+library(stringr)   
+library(tidytext)  
+library(text2vec)  
+library(widyr)     
+library(irlba)     
+library(umap)      
+library(quanteda)  
+library(conText)
+
+# Domains
+library(urltools)
+library(purrr)
+library(urltools)
+library(httr)
+library(httr2)
+#devtools::install_github("ironholds/urltools")
+  library("urltools")
+
+
+# GPT Analysis
+library(httr2)
+library(dplyr)
+library(purrr)
+library(stringr)
+library(progressr)
+library(tibble)
+
+#Word embeddings
+library(Matrix)
+library(igraph)
+
+# Fonts
+ # install.packages("showtext")
+ # install.packages("sysfonts")
+library(showtext)
+library(sysfonts)
+font_add_google("EB Garamond", "ebgaramond")
+# Automatically use showtext for new plots
+showtext_auto()
+
+# Other
+options(digits = 3)
+set.seed(999) 
+
+#Output
+output_path <- "C:/Users/andre/Documents/GitHub/VotingMachines/_output"
+```
+
+```{r, warning=FALSE}
+df_fb <- readr::read_csv('df_FB_processed.csv')
+# Introduction of the bill: [11/10/2019]. See https://www.camara.leg.br/noticias/598363-pec-torna-obrigatorio-voto-impresso-em-eleicoes-no-brasil
+
+#Inspect
+# df_fb %>%
+#   summarise(
+#     first_timestamp = min(timestamp, na.rm = TRUE),
+#     last_timestamp  = max(timestamp, na.rm = TRUE),
+#     n_missing_timestamps = sum(is.na(timestamp))
+#   )
+```
+# Domains Analysis
+### URL Extraction
+```{r}
+df_fb <- df_fb %>%
+  mutate(
+    url_clean = if_else(
+      !is.na(url_original) &
+        str_detect(url_original, regex("facebook", ignore_case = TRUE)),
+      NA_character_,
+      url_original
+    )
+  )
+```
+
+```{r}
+# Helper: ensure scheme present so regex and urltools behave consistently
+add_scheme_if_missing <- function(x) {
+  ifelse(is.na(x) | x == "", NA_character_,
+         ifelse(str_detect(x, "^[a-zA-Z][a-zA-Z0-9+.-]*://"), x, paste0("https://", x)))
+}
+
+# Helper Functions
+ensure_scheme <- function(x) {
+  ifelse(
+    is.na(x) | x == "",
+    NA_character_,
+    ifelse(
+      str_detect(x, "^[a-zA-Z][a-zA-Z0-9+.-]*://"),
+      x,
+      paste0("https://", x)
+    )
+  )
+}
+
+extract_host <- function(url) {
+  url2 <- add_scheme_if_missing(url)
+  host <- ifelse(
+    is.na(url2),
+    NA_character_,
+    sub("^https?://([^/]+).*", "\\1", url2, ignore.case = TRUE)
+  )
+  tolower(host)
+}
+
+
+# Registrable domain (eTLD+1), robust + vectorized
+   # Handles NAs cleanly and emoves .com, .com.br, .org.br
+   # Fixes cases like veja.abril.com.br → veja
+
+registrable_domain <- function(url) {
+
+  # ---- Normalize ----
+  url_norm <- tolower(url)
+  url_norm <- str_remove(url_norm, "^https?://")
+  url_norm <- str_remove(url_norm, "^www[0-9]?\\.")
+  url_norm <- str_remove(url_norm, "/.*$")
+
+  extracted <- suffix_extract(url_norm)
+
+  domain_full <- ifelse(
+    is.na(extracted$domain) | is.na(extracted$suffix),
+    NA_character_,
+    paste0(extracted$domain, ".", extracted$suffix)
+  )
+
+  # Remove generic endings
+  domain_simplified <- str_remove(domain_full, "\\.(com|org)(\\.br)?$")
+
+  # ---- Host-level parsing ----
+  host <- extract_host(url)
+  host <- str_remove(host, "^www[0-9]?\\.")
+  subdomain <- str_extract(host, "^[^.]+")
+
+  domain_final <- domain_simplified
+
+  # ---- GROUP RULES ----
+
+  ## Abril (veja.abril.com.br → veja)
+  domain_final <- ifelse(
+    str_detect(host, "abril\\.com\\.br$") & subdomain != "abril",
+    subdomain,
+    domain_final
+  )
+
+  ## Globo (*.globo.com → brand.globo)
+  domain_final <- ifelse(
+    str_detect(host, "\\.globo\\.com$") & subdomain != "globo",
+    paste0(subdomain, ".globo"),
+    domain_final
+  )
+
+  ## UOL
+  uol_verticals <- c(
+    "noticias", "economia", "esporte", "entretenimento", "universa",
+    "splash", "tilt", "vivabem", "nossa", "carros", "tv", "tab",
+    "blog", "colunas", "educacao", "ciencia", "ecoa"
+  )
+
+  domain_final <- ifelse(
+    str_detect(host, "\\.uol\\.com\\.br$") & subdomain != "uol",
+    ifelse(subdomain %in% uol_verticals,
+           paste0(subdomain, ".uol"),
+           subdomain),
+    domain_final
+  )
+
+  ## clicRBS (*.clicrbs.com.br → brand.clicrbs)
+  domain_final <- ifelse(
+    str_detect(host, "\\.clicrbs\\.com\\.br$") & subdomain != "clicrbs",
+    paste0(subdomain, ".clicrbs"),
+    domain_final
+  )
+
+  ## IG (*.ig.com.br → brand.ig)
+  domain_final <- ifelse(
+    str_detect(host, "\\.ig\\.com\\.br$") & subdomain != "ig",
+    paste0(subdomain, ".ig"),
+    domain_final
+  )
+
+  domain_final
+}
+```
+
+```{r}
+df_fb <- df_fb %>%
+  mutate(
+    url_fixed  = ensure_scheme(url_clean),
+    host       = extract_host(url_fixed),
+    domain     = registrable_domain(url_fixed)
+  ) %>%
+  select(-url_fixed)
+```
+
+```{r}
+#Inspect
+domains_top_overall <- df_fb %>%
+  filter(!is.na(domain), domain != "") %>%
+  count(domain, name = "n") %>%
+  arrange(desc(n))
+
+# Number of Link posts
+sum(df_fb$type == "Link", na.rm = TRUE)
+# Number of rows with an extracted domain
+sum(!is.na(df_fb$domain) & df_fb$domain != "")
+```
+**Shortened URLs**
+```{r}
+library(progressr)
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+short_domains <- c("bit.ly", "buff.ly")
+TIMEOUT_SEC <- 10
+SLEEP_SEC   <- 0.15
+RETRIES     <- 2
+UA <- "Mozilla/5.0 (compatible; LinkUnshortener/1.0; +research)"
+
+get_host <- function(u) {
+  u <- tolower(u %||% "")
+  u <- str_remove(u, "^https?://")
+  u <- str_remove(u, "^www[0-9]?\\.")
+  str_extract(u, "^[^/]+")
+}
+
+# Only called when we detect a Bitly preview/security page
+extract_destination_from_html_fast <- function(html_text) {
+  # Lightweight regex approach (no rvest):
+  # grab absolute URLs from href="..."; drop bitly/buffly/bitly.com; pick longest.
+  hrefs <- str_match_all(html_text, 'href\\s*=\\s*"((?:https?://)[^"]+)"')[[1]]
+  if (nrow(hrefs) == 0) return(NA_character_)
+  candidates <- unique(hrefs[, 2])
+
+  candidates <- candidates[!str_detect(candidates, regex("bit\\.ly|buff\\.ly|bitly\\.com", ignore_case = TRUE))]
+  if (length(candidates) == 0) return(NA_character_)
+
+  candidates[which.max(nchar(candidates))]
+}
+
+resolve_short_url <- function(url,
+                              timeout_sec = TIMEOUT_SEC,
+                              retries = RETRIES,
+                              sleep_sec = SLEEP_SEC) {
+
+  if (is.na(url) || url == "") {
+    return(c(url_final = NA_character_, method = "skip", status = NA_character_, error = NA_character_))
+  }
+
+  req_base <- request(url) %>%
+    req_user_agent(UA) %>%
+    req_timeout(timeout_sec) %>%
+    req_retry(max_tries = retries + 1)
+
+  # 1) HEAD with redirects
+  head_out <- tryCatch({
+    resp <- req_base %>% req_method("HEAD") %>% req_perform()
+    final_url <- resp_url(resp)
+    status <- as.character(resp_status(resp))
+    c(url_final = final_url, method = "HEAD", status = status, error = NA_character_)
+  }, error = function(e) {
+    c(url_final = url, method = "HEAD_error", status = NA_character_, error = conditionMessage(e))
+  })
+
+  Sys.sleep(sleep_sec)
+
+  # If resolved to non-shortener and not bitly.com, accept
+  fh <- get_host(head_out["url_final"])
+  if (!is.na(fh) &&
+      !fh %in% short_domains &&
+      !str_detect(head_out["url_final"], regex("bitly\\.com", ignore_case = TRUE))) {
+    return(head_out)
+  }
+
+  # 2) GET only if we're still on shortener / bitly preview
+  get_out <- tryCatch({
+    resp <- req_base %>% req_method("GET") %>% req_perform()
+    status <- as.character(resp_status(resp))
+    final_url <- resp_url(resp)
+
+    body_txt <- resp_body_string(resp)
+    dest <- extract_destination_from_html_fast(body_txt)
+
+    if (!is.na(dest) && dest != "") {
+      c(url_final = dest, method = "GET_parse", status = status, error = NA_character_)
+    } else {
+      c(url_final = final_url, method = "GET_no_dest", status = status,
+        error = "Could not extract destination from HTML (preview/security page or blocked).")
+    }
+  }, error = function(e) {
+    c(url_final = url, method = "GET_error", status = NA_character_, error = conditionMessage(e))
+  })
+
+  Sys.sleep(sleep_sec)
+  get_out
+}
+
+# ---- 1) unique short URLs only (small vector) ----
+short_urls <- df_fb$url_clean[
+  !is.na(df_fb$url_clean) &
+    df_fb$url_clean != "" &
+    df_fb$domain %in% short_domains
+]
+short_urls <- unique(short_urls)
+
+# ---- 2) resolve with progress, produce ONE log object ----
+handlers("progress")
+
+with_progress({
+  p <- progressor(along = short_urls)
+
+  res_list <- map(short_urls, ~{
+    p(message = "Unshortening bit.ly / buff.ly…")
+    resolve_short_url(.x)
+  })
+
+  unshort_log <- tibble(
+    url_short = short_urls,
+    url_final = map_chr(res_list, ~ .x[["url_final"]]),
+    method    = map_chr(res_list, ~ .x[["method"]]),
+    status    = map_chr(res_list, ~ .x[["status"]]),
+    error     = map_chr(res_list, ~ .x[["error"]])
+  )
+})
+
+# ---- 3) overwrite url_clean via a fast named-lookup ----
+resolved_ok <- with(unshort_log,
+  !is.na(url_final) &
+    url_final != url_short &
+    !get_host(url_final) %in% short_domains &
+    !str_detect(url_final, regex("bitly\\.com", ignore_case = TRUE))
+)
+
+lookup <- unshort_log$url_final
+names(lookup) <- unshort_log$url_short
+lookup_ok <- lookup[resolved_ok]
+
+# Replace only for shortener rows; keep everything else unchanged
+is_short_row <- df_fb$domain %in% short_domains &
+  !is.na(df_fb$url_clean) & df_fb$url_clean != ""
+
+df_fb$url_clean[is_short_row] <- ifelse(
+  df_fb$url_clean[is_short_row] %in% names(lookup_ok),
+  unname(lookup_ok[df_fb$url_clean[is_short_row]]),
+  df_fb$url_clean[is_short_row]
+)
+
+# (Optional) keep the log for auditing:
+ unshort_log %>% count(method, sort = TRUE)
+```
+
+I identified shortened links by examining URLs that appeared at least 50 times, yielding 221 Bitly and 57 Buff.ly links. These URLs were expanded using HTTP redirect resolution, successfully resolving 159 Bitly links. Unresolved links typically returned HTTP errors or were blocked by security restrictions, reflecting link decay and platform-level protections rather than data-processing limitations.
+
+### Gephi
+
+```{r}
+norm <- function(x) trimws(tolower(x))
+
+df_gephi_overall <- df_fb %>%
+  dplyr::select(author, domain, party, PEC135, page_followers) %>%
+  dplyr::mutate(
+    author = norm(author),
+    domain    = norm(domain)
+  )
+
+# EDGES (author → domain), with prefixed IDs 
+edges_table_overall <- df_gephi_overall %>%
+  dplyr::filter(
+    !is.na(author), author != "",
+    !is.na(domain),    domain    != ""
+  ) %>%
+  dplyr::transmute(
+    Source = paste0("author::", author),
+    Target = paste0("domain::", domain)
+  )
+
+# NODES
+author_nodes_overall <- df_gephi_overall %>%
+  dplyr::filter(!is.na(author), author != "") %>%
+  dplyr::group_by(author) %>%
+  dplyr::summarise(
+    Id            = paste0("author::", dplyr::first(author)),
+    Label         = dplyr::first(author),
+    party         = dplyr::first(stats::na.omit(party)),
+    PEC135        = dplyr::first(stats::na.omit(PEC135)),
+    avg_followers = mean(page_followers, na.rm = TRUE),
+    total_posts   = dplyr::n(),
+    type          = "author",
+    .groups       = "drop"
+  ) %>%
+  # bring in PDR_posts from fb_breakdown (author == author)
+  dplyr::left_join(
+    fb_breakdown %>%
+      dplyr::transmute(
+        author = author,
+        PDR_posts = as.integer(PDR_posts)
+      ),
+    by = "author"
+  ) %>%
+  dplyr::mutate(
+    party         = dplyr::if_else(is.na(party) | party == "", "NotApplicable", as.character(party)),
+    PEC135        = as.integer(dplyr::if_else(is.na(PEC135), -1L, PEC135)),
+    avg_followers = as.double(dplyr::if_else(is.na(avg_followers) | is.nan(avg_followers), 0, avg_followers)),
+    total_posts   = as.integer(total_posts),
+
+    # keep PDR_posts only when PEC135 == 1, else 0
+    PDR_posts     = dplyr::if_else(PEC135 == 1L, dplyr::coalesce(PDR_posts, 0L), 0L)
+  )
+
+# DOMAIN NODES
+domain_nodes_overall <- edges_table_overall %>%
+  dplyr::distinct(Target) %>%
+  dplyr::transmute(
+    Id            = Target,
+    Label         = sub("^domain::", "", Target),
+    party         = "NotApplicable",
+    PEC135        = -1L,
+    avg_followers = 0,
+    total_posts   = 0L,
+    type          = "domain"
+  )
+
+nodes_table_overall <- dplyr::bind_rows(author_nodes_overall, domain_nodes_overall) %>%
+  dplyr::distinct(Id, .keep_all = TRUE)
+
+# EXPORT
+write.csv(nodes_table_overall, "nodes_table_overall.csv", row.names = FALSE, na = "")
+write.csv(edges_table_overall, "edges_table_overall.csv", row.names = FALSE, na = "")
+```
+
+### Domain categorization
+```{r}
+domain_analysis <- edges_table_overall %>%
+  dplyr::mutate(domain = sub("^domain::", "", Target)) %>%
+  dplyr::group_by(domain) %>%
+  dplyr::summarise(n_pages = dplyr::n_distinct(Source), .groups = "drop") %>%
+  dplyr::mutate(
+    category = dplyr::case_when(
+
+      # --- STATE DOMAINS ---
+      stringr::str_detect(domain, stringr::fixed("leg.br")) |
+        stringr::str_detect(domain, stringr::fixed(".gov")) |
+        domain %in% c(
+          "fapesp.br","fiocruz.br","mpf.mp.br","stf.jus.br","tse.jus.br",
+          "tjpr.jus.br","tjsc.jus.br","tjap.jus.br","tjmg.jus.br","trf2.jus.br",
+          "sabesp","prefeitura.rio","embrapa.br","sebrae"
+        ) ~ "state_domains",
+
+      # --- BLOGS ---
+      stringr::str_detect(domain, stringr::regex("blog", ignore_case = TRUE)) |
+        domain %in% c("cozinhabruta") ~ "blog_domains",
+
+      # --- INDIVIDUAL ---
+      domain %in% c(
+      "capitaoaugusto", "carolinedetoni", "deputadojoaodaniel", "fernandapsol", "ivanvalente", "jilmartatto", "paulosampaio", "renatasouzapsol", "samiabomfim", "taliriapetrone"
+  ) |
+    n_pages == 1 ~ "individual_domains",
+
+      # --- MAINSTREAM MEDIA ---
+      domain %in% c(
+        "folha","noticias.uol","band","g1.globo","oglobo.globo","estadao","bbc","washingtonpost","exame","extra.globo","folha1","gazetadopovo","glo.bo","lemonde.fr","nytimes","elpais","eldiario.es","correiobraziliense","clarin","cnn","cnnbrasil","istoedinheiro","istoe","reuters","theguardian","uol","valor","bbc.co.uk","bbc.in","elpais.com.uy","wsj","aosfatos","dailymail.co.uk","independent.co.uk","infomoney","sbt","sbtinterior","sbtnews","metropolenoticias", "telegraph.co.uk"
+      ) |
+        stringr::str_detect(domain, stringr::fixed(".uol")) |
+        stringr::str_detect(domain, stringr::fixed(".globo")) ~ "mainstream_domains",
+
+      # --- PLATFORMS ---
+      domain %in% c(
+        "google","youtube","linkedin","instagram","netflix","pscp.tv","tiktok",
+        "whatsapp","youtu.be","substack","wikipedia","medium"
+      ) ~ "platform_domains",
+
+      # --- PARTY DOMAINS ---
+      domain %in% c(
+        "pt","ptnacamara","psol","ptceara","podemos","pcdobnacamara","pcdob","pcdobba","pdt","pdtnacamara","pps","prb10","prb10rj","republicanos10","republicanos1010","mulheresrepublicanas10","pl22","prbnacamara","pros","prosnacamara","psb40","psbnacamara","psd","psdb","psdbnacamara","psdcamara","psol50","psolcarioca","psolnacamara","pt-pr","ptb","ptbnacamara","ptnosenado","ptsaopaulo","ptsul","republicanos10nacamara","prb10sp","prbmg10","prbmulher10","pros90","psb40bahia","psc","psd-mg","psl-sp","psol50sp","psolbemviver","psolcamarasp","psolniteroi","psolsaude","psolsemente","pt-assembleia-sp","ptalagoas","ptbahia","ptcarioca","ptmt","ptnaalep","ptpaulista","ptsc","pv","republicanos10mg","republicanos10riopreto","republicanos10sp","solidariedaderj","cstpsol","democratas","novo","novonacamara","progressistas"
+      ) ~ "party_domains",
+
+      # --- IDEOLOGICAL ---
+      domain %in% c(
+        "cartacapital","jacobin","jovempan","piaui","midianinja","brasilsemmedo",
+        "tercalivre","renovamidia","plenonews","romanews","esquerdadiario",
+        "esquerdaonline","intercept","theintercept","veja","vejario","vejasp"
+      ) ~ "ideological_domains",
+
+      # --- RADIO ---
+      domain %in% c(
+        "radiobandeirantes","bandnewsfm","bandnewsfmcuritiba","bandnewsfmrio","radiocabiuna","radiocacula","radiocaxias","radioclubfm.net","radiocomunitariaclubefm","radioconvencao","radiocorredor","radiocostaverdefm","radiocruzdemalta","radiofmz","radiofolhabv","radiogeracao", "metropolitanoonline" ,"radioglobocampogrande","radioguaratuba","radiohora","radioiara","radiointegracaoam1180","radioipiranga","radiometropole","radionereuramos","radionovaprogresso","radiopanoramicafm","radiopeaobrasil","radioprata","radiosanfm","radiosantacruz","radiosaoluiz","radiosaopedrense","radioschroederfm","radiosoledade","radiotaquara","radioterena","radiotucunare","radioturmalina","radiouniversitariafm","radioveracruz","radiowebcp","94fm","anchor.fm","cbncaruaru","cbncuritiba","cbnlondrina","cbnmaringa","cbnrecife","cbnvitoria"
+      ) ~ "radio_domains",
+
+      # --- MOVEMENTS & CIVIL SOCIETY ---
+      domain %in% c(
+        "mises","mblnews","mst","catracalivre","coalizaonegrapordireitos",
+        "coletivojuntas","eleicoesantirracistas","emdefesadofundoamazonia",
+        "frentedaprimeirainfancia","frenteforabolsonaro","frentenacionaldeluta",
+        "frenteparlamentarindigena","mulherespormaisdireitos","mundonegro.inf.br",
+        "mundosindical","oxfam",
+        "febraban","fecomercio-se","sinasefebrasilia","sindautoescola",
+        "sindbancarios","sindcefetmg","sindcop","sindesvdf","sindifes",
+        "sindifisconacional","sindilojas-sp","sindilojasgravatai","sindipetro",
+        "sindipetroprsc","sindipetrorn","sindiprev-se","sindiserfrs","sindmepa",
+        "sindsaudesp","sindsprev","sinffazfisco","sinjorba","sinpofesc","sinposba",
+        "sinprfmg","sinproesemma","sinprors","sinssp","sinteal","sintectrj",
+        "sintufrj","sissaude","sistemafaep","cutbrasilia",
+        "cut","cutrs","greenpeace","almapreta","appsindicato",
+        "casomarielleeanderson","consultaquilombolaja","democraciasocialista",
+        "institutomariellefranco","movimentorevista","mtst",
+        "observatoriodademocracia","observatoriodaimprensa",
+        "observatoriodatelevisao","observatoriodoconhecimento","observatoriog",
+        "rendabasica"
+      ) ~ "movements_civil_society",
+
+      # --- ONLINE NEWS ---
+      domain %in% c(
+        "nexojornal","oantagonista","poder360","buzzfeed","yahoo",
+        "huffpost","huffpostbrasil","r7","terra","terrabrasilnoticias"
+      ) ~ "online_news_domains",
+
+      TRUE ~ "other_domains"
+    )
+  ) %>%
+  dplyr::group_by(category) %>%
+  dplyr::summarise(domains = list(sort(unique(domain))), .groups = "drop") %>%
+  dplyr::mutate(
+    category = factor(
+      category,
+      levels = c(
+        "individual_domains",
+        "mainstream_domains",
+        "online_news_domains",
+        "party_domains",
+        "ideological_domains",
+        "movements_civil_society",
+        "radio_domains",
+        "platform_domains",
+        "blog_domains",
+        "state_domains",
+        "other_domains"
+      )
+    )
+  ) %>%
+  dplyr::arrange(category) %>%
+  dplyr::mutate(category = as.character(category))
+
+domain_analysis_visualization <- domain_analysis %>%
+  dplyr::mutate(domains = vapply(domains, paste, collapse = ", ", FUN.VALUE = character(1)))
+```
+
+## Participation breakdown
+
+```{r}
+fb_breakdown <- df_fb %>%
+  arrange(author, timestamp) %>%
+  group_by(author) %>%
+  summarise(
+    total_posts = n(),
+    avg_interactions = round(mean(interactions, na.rm = TRUE), 2),
+    sd_interactions  = round(sd(interactions, na.rm = TRUE), 2),
+    native_video_posts = sum(type == "Native Video", na.rm = TRUE),
+    photo_posts = sum(type == "Photo", na.rm = TRUE),
+    live_video_complete_posts = sum(type == "Live Video Complete", na.rm = TRUE),
+    link_posts = sum(type == "Link", na.rm = TRUE),
+    youtube_posts = sum(type == "YouTube", na.rm = TRUE),
+    followers_start = first(page_followers[!is.na(page_followers)]),
+    followers_end   = last(page_followers[!is.na(page_followers)]),
+    followers_change = followers_end - followers_start,
+    .groups = "drop")
+  # ) %>%
+  # left_join(author_pec, by = "author")
+```
+
+```{r}
+# Build a lookup table (domain -> category)
+domain_lookup <- domain_analysis_visualization %>%
+  mutate(
+    category = str_trim(category),
+    domains  = str_split(domains, "\\s*,\\s*")  
+  ) %>%
+  unnest(domains) %>%
+  transmute(
+    domain   = str_to_lower(str_trim(domains)),
+    category = category
+  ) %>%
+  filter(!is.na(domain), domain != "") %>%
+  distinct(domain, .keep_all = TRUE)
+
+# Count, per author, how many times they referenced each category
+domain_counts_by_author <- GPT_processed_data %>%
+  mutate(domain = str_to_lower(str_trim(domain))) %>%
+  filter(!is.na(domain), domain != "") %>%
+  inner_join(domain_lookup, by = "domain") %>%
+  count(author, category, name = "n_domain_refs") %>%
+  tidyr::pivot_wider(
+    names_from  = category,
+    values_from = n_domain_refs,
+    values_fill = 0
+  )
+
+# Join into fb_breakdown
+fb_breakdown <- fb_breakdown %>%
+  left_join(domain_counts_by_author, by = "author") %>%
+  mutate(
+    # ensure these exist even for authors with zero matched domains
+    mainstream_domains   = coalesce(mainstream_domains, 0L),
+    individual_domains   = coalesce(individual_domains, 0L),
+    online_news_domains  = coalesce(online_news_domains, 0L),
+    party_domains        = coalesce(party_domains, 0L),
+    ideological_domains  = coalesce(ideological_domains, 0L),
+    platform_domains     = coalesce(platform_domains, 0L),
+    blog_domains         = coalesce(blog_domains, 0L),
+    state_domains        = coalesce(state_domains, 0L)
+  )
+```
+
+```{r}
+font_add_google("EB Garamond", "ebgaramond")
+showtext_auto()
+
+# keep only PEC135 groups 0 and 1 (and keep their existing factor order)
+tmp_levels <- c("0", "1", "3", "NA")
+
+content_summary_total_wide <- fb_breakdown %>%
+  mutate(
+    pec_group = factor(
+      dplyr::case_when(
+        is.na(PEC135) ~ "NA",
+        TRUE ~ as.character(PEC135)
+      ),
+      levels = tmp_levels
+    ),
+    side = dplyr::recode(pec_group, `0` = "Against PEC", `1` = "Pro PEC")
+  ) %>%
+  filter(pec_group %in% c("0", "1")) %>%
+  group_by(pec_group, side) %>%
+  summarise(
+    avg_posts = mean(total_posts, na.rm = TRUE),
+    sd_posts  = sd(total_posts, na.rm = TRUE),
+
+    mean_avg_interactions = mean(avg_interactions, na.rm = TRUE),
+    sd_avg_interactions   = sd(avg_interactions, na.rm = TRUE),
+
+    avg_follower_change = mean(followers_change, na.rm = TRUE),
+    sd_follower_change  = sd(followers_change, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+content_comparison_total <- bind_rows(
+  content_summary_total_wide %>%
+    transmute(side, metric = "Average Posts",
+              avg = avg_posts, sd = sd_posts),
+
+  content_summary_total_wide %>%
+    transmute(side, metric = "Average Interactions",
+              avg = mean_avg_interactions, sd = sd_avg_interactions),
+
+  content_summary_total_wide %>%
+    transmute(side, metric = "Average Follower Growth",
+              avg = avg_follower_change, sd = sd_follower_change)
+)
+
+# quick check table
+content_comparison_total %>%
+  filter(metric == "Average Interactions") %>%
+  select(side, avg, sd)
+
+# plot (keep colors aligned with original 0/1 ordering by controlling factor levels)
+content_comparison_total <- content_comparison_total %>%
+  mutate(side = factor(side, levels = c("Against PEC", "Pro PEC")))
+
+ggplot(content_comparison_total, aes(x = side, y = avg, fill = side)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_errorbar(
+    aes(ymin = avg - sd, ymax = avg + sd),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  facet_wrap(~ metric, scales = "free_y") +
+  labs(
+    title = "Participation Breakdown",
+    x = "", y = ""
+  ) +
+  theme_minimal(base_family = "garamond") +
+  theme(
+    text = element_text(family = "ebgaramond"),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    legend.position = "none",
+    plot.title = element_text(size = 40, face = "bold"),
+    strip.text = element_text(size = 30)
+  )
+```
+
+```{r}
+#C:\Users\andre\Documents\GitHub\VotingMachines\output
+ggsave(
+  filename = "Participation_Breakdown_PEC-GROUPS.png",
+  path = "C:/Users/andre/Documents/GitHub/VotingMachines/output",
+  plot = last_plot(),
+  device = "png",
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+```
+
+```{r}
+content_summary_total <- fb_breakdown %>%
+  mutate(
+    side = factor(
+      case_when(
+        is.na(PEC135) ~ "NA",
+        TRUE ~ as.character(PEC135)
+      ),
+      levels = c("0", "1", "3", "NA")
+    )
+  ) %>%
+  filter(side %in% c("0", "1")) %>%
+  group_by(side) %>%
+  summarise(
+    photo_posts        = sum(photo_posts, na.rm = TRUE),
+    native_video_posts = sum(native_video_posts, na.rm = TRUE),
+    link_posts         = sum(link_posts, na.rm = TRUE),
+    youtube_posts      = sum(youtube_posts, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = -side, names_to = "type", values_to = "count") %>%
+  mutate(
+    type = recode(type,
+      "photo_posts"        = "Photo Posts",
+      "link_posts"         = "Posts with Links",
+      "native_video_posts" = "Native Videos",
+      "youtube_posts"      = "YouTube Links"
+    ),
+    side_label = dplyr::recode(side, `0` = "Against", `1` = "Pro")
+  )
+
+ggplot(content_summary_total, aes(x = type, y = count, fill = side_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    title = "Comparison of Content Format Usage",
+    y = "Number of Posts",
+    x = " "
+  ) +
+  theme_minimal(base_family = "garamond") +
+  theme(
+    text = element_text(family = "ebgaramond"),
+    plot.title = element_text(size = 30, face = "bold"),
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 20),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 20)
+  )
+```
+
+```{r}
+domain_rates_total <- fb_breakdown %>%
+  mutate(
+    side = factor(
+      case_when(
+        is.na(PEC135) ~ "NA",
+        TRUE ~ as.character(PEC135)
+      ),
+      levels = c("0", "1", "3", "NA")
+    )
+  ) %>%
+  filter(side %in% c("0", "1")) %>%
+  group_by(side) %>%
+  summarise(
+    total_posts = sum(total_posts, na.rm = TRUE),
+
+    mainstream_domains  = sum(mainstream_domains,  na.rm = TRUE),
+    individual_domains  = sum(individual_domains,  na.rm = TRUE),
+    party_domains       = sum(party_domains,       na.rm = TRUE),
+    platform_domains    = sum(platform_domains,    na.rm = TRUE),
+    blog_domains        = sum(blog_domains,        na.rm = TRUE),
+    state_domains       = sum(state_domains,       na.rm = TRUE),
+    radio_domains       = sum(radio_domains,       na.rm = TRUE),
+    movements_civil_society = sum(movements_civil_society, na.rm = TRUE),
+
+    # keep these for total_domains, but we’ll hide them later
+    ideological_domains = sum(ideological_domains, na.rm = TRUE),
+    online_news_domains = sum(online_news_domains, na.rm = TRUE),
+    other_domains       = sum(other_domains,       na.rm = TRUE),
+
+    total_domains = sum(
+      mainstream_domains, individual_domains, online_news_domains, party_domains,
+      ideological_domains, platform_domains, blog_domains, state_domains,
+      radio_domains, movements_civil_society, other_domains,
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    across(
+      c(total_domains, mainstream_domains, individual_domains, party_domains,
+        platform_domains, blog_domains, state_domains,
+        radio_domains, movements_civil_society,
+        ideological_domains, online_news_domains, other_domains),
+      ~ 100 * .x / total_posts
+    )
+  ) %>%
+  select(-total_posts) %>%
+  
+  # REMOVE UNFINISHED COLUMNS
+  select(-ideological_domains, -online_news_domains, -other_domains) %>%
+  pivot_longer(cols = -side, names_to = "domain_type", values_to = "rate_per_100") %>%
+  
+  
+  mutate(
+    domain_type = recode(domain_type,
+      "total_domains"      = "Total domains",
+      "mainstream_domains" = "Mainstream domains",
+      "individual_domains" = "Individual domains",
+      "party_domains"      = "Party domains",
+      "platform_domains"   = "Platform domains",
+      "blog_domains"       = "Blog domains",
+      "state_domains"      = "State domains",
+      "radio_domains"      = "Radio domains",
+      "movements_civil_society" = "Movements & civil society"
+    ),
+    side_label = dplyr::recode(side, `0` = "Against", `1` = "Pro")
+  )
+
+
+ggplot(domain_rates_total, aes(x = domain_type, y = rate_per_100, fill = side_label)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.1, suffix = " per 100")) +
+  labs(
+    title = "Domain Mentions (Rates per 100 Posts)",
+    y = "Rate",
+    x = " "
+  ) +
+  theme_minimal(base_family = "garamond") +
+  theme(
+    text = element_text(family = "ebgaramond"),
+    plot.title = element_text(size = 40, face = "bold"),
+    axis.title = element_text(size = 30),
+    axis.text.x = element_text(size = 30, angle = 30, hjust = 1),
+    axis.text.y = element_text(size = 30),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 30)
+  )
+```
+
+```{r}
+ggsave(
+  filename = "Domains_Breakdown_PEC-GROUPS.png",
+  path = "C:/Users/andre/Documents/GitHub/VotingMachines/output",
+  plot = last_plot(),
+  device = "png",
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+```
+
+## Communication Style Breakdown
+```{r}
+# Create dominant_style
+df_fb <- df_fb %>%
+  mutate(
+    dominant_style = case_when(
+      parochial_matches == 0 &
+        programmatic_matches == 0 &
+        propagandistic_matches == 0 ~ "No match",
+
+      parochial_matches > programmatic_matches &
+        parochial_matches > propagandistic_matches ~ "Parochial",
+
+      programmatic_matches > parochial_matches &
+        programmatic_matches > propagandistic_matches ~ "Programmatic",
+
+      propagandistic_matches > parochial_matches &
+        propagandistic_matches > programmatic_matches ~ "Propagandistic",
+
+      TRUE ~ "Tie"
+    ),
+    dominant_style = factor(
+      dominant_style,
+      levels = c("Parochial", "Programmatic", "Propagandistic", "Tie", "No match")
+    )
+  )
+
+```
+
+# Election Integrity Subset
+
+## Regex Filtering
+```{r}
+# List of keywords
+voting_keywords <- unique(c(
+
+  ## PEC 135 / voto impresso debate (labels + shorthand)
+  "pec 135", "pec135", "pec 13519", "pec 135 2019", "13519", "1352019",
+
+  ## urnas eletronicas (generic + phrase + no-space)
+  "urna", "urnas", "urna eletronica", "urnas eletronicas", "urnaeletronica",
+
+  ## voto impresso / auditavel (phrase + no-space + broad tokens)
+  "voto impresso", "votos impressos",
+  "voto auditavel", "votos auditaveis",
+  "votoimpresso", "votoauditavel",
+
+  ## fraude / manipulacao / irregularidades (broad + phrase + no-space)
+  "fraude", "fraudar", "fraudado", "fraudada", "fraudados", "fraudadas",
+  "fraude eleitoral", "fraudes eleitorais",
+  "fraude nas urnas", "eleicoes fraudadas",
+  "fraudar urnas", "fraudar as eleicoes",
+  "urnasfraudadas", "urnafraudada",
+  "fraudenasurnas",
+
+  ## auditoria / recontagem (process terms)
+  "auditoria", "auditar", "auditagem", 
+  "apuracao dos votos", "apurar votos", 
+  "recontagem de votos", "recontar votos",
+
+  ## seguranca / hackers / vulnerabilidades 
+  "hacker", "hackers", "hackear", "hackeado",
+  "ataque", "ataques", "ataque hacker",
+  "invasao", "invadir",
+  "codigofonte", "codigo fonte",
+  "golpe eleitoral",
+  
+  ## instituicoes / atores (often invoked in integrity claims)
+  "tse", "justica eleitoral", "smartmatic"
+  ))
+```
+
+```{r}
+# FACEBOOK
+# Filter the dataframe to keep rows containing at least one of the keywords
+keywords_pattern <- paste(voting_keywords, collapse = "|")
+
+df_fb_filtered <- df_fb %>%
+  filter(str_detect(text_combined, keywords_pattern))
+```
+
+## GPT Filtering
+
+#### Sample
+
+```{r}
+# Load your API key
+my_API <- "...."
+
+`%||%` <- function(a,b) if (is.null(a)) b else a
+```
+
+#### Filtered DF
+```{r}
+# API caller
+gpt_model <- "gpt-4.1-mini"
+# JSON API caller
+hey_chatGPT_json <- function(prompt_text,
+                             api_key = my_API,
+                             model = "gpt-4.1-mini",
+                             temperature = 0,
+                             max_tries = 6,
+                             max_tokens = 80,
+                             schema_name = "classification",
+                             schema) {
+  
+  attempt <- 1
+  
+  repeat {
+    
+    resp <- tryCatch({
+      request("https://api.openai.com/v1/chat/completions") %>%
+        req_auth_bearer_token(api_key) %>%
+        req_timeout(120) %>%
+        req_body_json(
+          list(
+            model = model,
+            temperature = temperature,
+            max_tokens = max_tokens,
+            messages = list(
+              list(
+                role = "user",
+                content = prompt_text
+              )
+            ),
+            response_format = list(
+              type = "json_schema",
+              json_schema = list(
+                name = schema_name,
+                strict = TRUE,
+                schema = schema
+              )
+            )
+          ),
+          auto_unbox = TRUE
+        ) %>%
+        req_perform()
+    }, error = function(e) {
+      message("API attempt ", attempt, " failed: ", conditionMessage(e))
+      NULL
+    })
+    
+    if (!is.null(resp)) {
+      content <- tryCatch(
+        resp_body_json(resp)$choices[[1]]$message$content,
+        error = function(e) {
+          message("Could not extract response content: ", conditionMessage(e))
+          NULL
+        }
+      )
+      
+      if (!is.null(content) && nzchar(content)) {
+        parsed <- tryCatch(
+          jsonlite::fromJSON(content),
+          error = function(e) {
+            message("Could not parse JSON content: ", conditionMessage(e))
+            NULL
+          }
+        )
+        
+        if (!is.null(parsed)) {
+          return(parsed)
+        }
+      }
+    }
+    
+    if (attempt >= max_tries) return(NULL)
+    
+    Sys.sleep(min(2^attempt, 30))
+    attempt <- attempt + 1
+  }
+}
+
+# --- Prompt builders ---
+build_prompt_q12 <- function(post_text) {
+  paste0(
+    "Voce esta analisando postagens de politicos brasileiros.\n\n",
+    
+    "Classifique a postagem respondendo a DUAS perguntas binarias.\n\n",
+    
+    "Q1: A postagem e sobre o funcionamento institucional ou tecnico do sistema/processo eleitoral?\n",
+    "Codifique Q1=1 apenas se a postagem discutir pelo menos um dos seguintes temas:\n",
+    "- PEC 135/2019;\n",
+    "- voto impresso ou voto auditavel;\n",
+    "- urnas eletronicas;\n",
+    "- cedulas ou sistema de votacao;\n",
+    "- auditoria das urnas ou dos votos;\n",
+    "- apuracao, contagem, recontagem, transmissao ou totalizacao de votos;\n",
+    "- TSE/TRE como autoridades que organizam, fiscalizam ou validam a eleicao;\n",
+    "- seguranca das urnas, ataques hackers contra urnas ou sistemas eleitorais;\n",
+    "- legitimidade do processo de votacao, apuracao, totalizacao ou certificacao dos resultados.\n\n",
+    
+    "Q2: Se Q1=1, a postagem questiona a integridade, seguranca, confiabilidade ou legitimidade do sistema/processo eleitoral?\n",
+    "Codifique Q2=1 apenas se a suspeita recair sobre urnas, voto eletronico, voto impresso/auditavel,\n",
+    "auditoria, apuracao, contagem, recontagem, transmissao, totalizacao, certificacao,\n",
+    "TSE/TRE ou legitimidade dos resultados oficiais.\n\n",
+    
+    "EXCLUA, codificando Q1=0 e Q2=0, postagens que tratem apenas de:\n",
+    "- corrupcao de candidatos;\n",
+    "- lavagem de dinheiro;\n",
+    "- fundo partidario ou fundo eleitoral;\n",
+    "- difamacao ou propaganda eleitoral;\n",
+    "- processos judiciais contra candidatos;\n",
+    
+    "REGRA CENTRAL:\n",
+    "Mesmo que a postagem use palavras como fraude, corrupcao, eleicao, urnas ou resultado,\n",
+    "codifique Q2=0 se ela nao questionar diretamente o sistema de votacao, apuracao,\n",
+    "auditoria, totalizacao, certificacao, TSE/TRE ou legitimidade dos resultados oficiais.\n\n",
+    
+    
+    "EXEMPLOS POSITIVOS:\n",
+    "- urnas eletronicas podem ser fraudadas: Q1=1 Q2=1;\n",
+    "- defesa do voto impresso/auditavel por falta de confiabilidade das urnas: Q1=1 Q2=1;\n",
+    "- informacao institucional sobre data/local de votacao, sem questionar integridade: Q1=1 Q2=0.\n\n",
+    
+    "Responda apenas no JSON solicitado.\n\n",
+    
+    "POST:\n",
+    post_text
+  )
+}
+
+build_prompt_q3 <- function(post_text) {
+  paste0(
+    "Voce esta analisando uma postagem que JA foi classificada como questionamento da integridade,\n",
+    "seguranca, confiabilidade ou legitimidade do sistema/processo eleitoral brasileiro.\n\n",
+    
+    "Q3: A postagem menciona ou usa exemplos de OUTROS PAISES para discutir integridade,\n",
+    "fraude, seguranca, confiabilidade ou legitimidade de urnas, voto, apuracao,\n",
+    "auditoria, totalizacao ou resultados eleitorais?\n\n",
+    
+    "Codifique Q3=1 se a postagem mencionar explicitamente outro pais, por exemplo EUA,\n",
+    "Estados Unidos, Venezuela, Argentina, Alemanha, Paraguai, Bolivia, etc., como comparacao,\n",
+    "exemplo ou justificativa em discussao sobre integridade eleitoral.\n\n",
+    
+    "Codifique Q3=0 se a postagem tratar apenas do Brasil ou nao usar outro pais como exemplo.\n\n",
+    
+    "Responda apenas no JSON solicitado.\n\n",
+    
+    "POST:\n",
+    post_text
+  )
+}
+
+# --- Parsers (robust to small variations) ---
+schema_q12 <- list(
+  type = "object",
+  additionalProperties = FALSE,
+  properties = list(
+    Q1 = list(type = "integer", enum = list(0, 1)),
+    Q2 = list(type = "integer", enum = list(0, 1))
+  ),
+  required = list("Q1", "Q2"))
+
+schema_q3 <- list(
+  type = "object",
+  additionalProperties = FALSE,
+  properties = list(
+    Q3 = list(type = "integer", enum = list(0, 1))
+  ),
+  required = list("Q3"))
+
+
+parse_q12_json <- function(x) {
+  if (is.null(x)) {
+    return(tibble(
+      Q1 = NA_integer_,
+      Q2 = NA_integer_,
+      GPT_Q12_success = FALSE
+    ))
+  }
+  
+  q1 <- suppressWarnings(as.integer(x$Q1))
+  q2 <- suppressWarnings(as.integer(x$Q2))
+  
+  if (!is.na(q1) && q1 == 0L) q2 <- 0L
+  
+  tibble(
+    Q1 = q1,
+    Q2 = q2,
+    GPT_Q12_success = !is.na(q1) & !is.na(q2)
+  )
+}
+
+
+parse_q3_json <- function(x) {
+  if (is.null(x)) {
+    return(tibble(
+      Q3 = NA_integer_,
+      GPT_Q3_success = FALSE
+    ))
+  }
+  q3 <- suppressWarnings(as.integer(x$Q3))
+  tibble(
+    Q3 = q3,
+    GPT_Q3_success = !is.na(q3)
+  )
+}
+
+
+# --- Wrappers that return 1-row tibbles ---
+hey_chatGPT_Q12 <- function(post_text,
+                            api_key = my_API,
+                            model = gpt_model,
+                            temperature = 0,
+                            max_tries = 6) {
+  
+  prompt <- build_prompt_q12(post_text)
+  
+  out <- hey_chatGPT_json(
+    prompt_text = prompt,
+    api_key = api_key,
+    model = model,
+    temperature = temperature,
+    max_tries = max_tries,
+    max_tokens = 80,
+    schema_name = "q12_classification",
+    schema = schema_q12
+  )
+  
+  parse_q12_json(out)
+}
+
+
+hey_chatGPT_Q3 <- function(post_text,
+                           api_key = my_API,
+                           model = gpt_model,
+                           temperature = 0,
+                           max_tries = 6) {
+  
+  prompt <- build_prompt_q3(post_text)
+  
+  out <- hey_chatGPT_json(
+    prompt_text = prompt,
+    api_key = api_key,
+    model = model,
+    temperature = temperature,
+    max_tries = max_tries,
+    max_tokens = 40,
+    schema_name = "q3_classification",
+    schema = schema_q3
+  )
+  
+  parse_q3_json(out)
+}
+```
+
+*Sample*
+```{r}
+df_sample <- df_fb_filtered %>%
+  filter(!is.na(text_combined), text_combined != "") %>%
+  slice_sample(n = 150)
+
+# library(progressr)
+handlers("progress")
+
+with_progress({
+  p <- progressor(along = df_sample$text_combined)
+
+  df_sample <- df_sample %>%
+    mutate(
+      GPT_Q12_raw = map(
+        text_combined,
+        ~{
+          p(message = "Classificando Q1/Q2...")
+          hey_chatGPT_Q12(.x)
+        }
+      )
+    ) %>%
+    unnest_wider(GPT_Q12_raw) %>%
+    mutate(
+      Q1 = as.integer(replace_na(Q1, 0L)),
+      Q2 = as.integer(replace_na(Q2, 0L)),
+      Q2 = if_else(Q1 == 0L, 0L, Q2)
+    )
+})
+
+#Q3
+with_progress({
+  idx_need_q3 <- which(df_sample$Q1 == 1L & df_sample$Q2 == 1L)
+  p <- progressor(along = idx_need_q3)
+
+  df_sample$Q3 <- 0L
+  df_sample$GPT_Q3_success <- NA
+
+  if (length(idx_need_q3) > 0) {
+    q3_tbl <- map_dfr(
+      idx_need_q3,
+      ~{
+        p(message = "Classificando Q3...")
+        out <- hey_chatGPT_Q3(df_sample$text_combined[.x])
+        tibble(row_index = .x) %>%
+          bind_cols(out)
+      }
+    )
+
+    df_sample$Q3[q3_tbl$row_index] <- as.integer(replace_na(q3_tbl$Q3, 0L))
+    df_sample$GPT_Q3_success[q3_tbl$row_index] <- q3_tbl$GPT_Q3_success
+  }
+})
+
+# ---- Check distributions ----
+df_sample %>% count(Q1)
+df_sample %>% count(Q2)
+df_sample %>% count(Q3)
+
+# Optional: check the full decision-tree combinations
+df_sample %>% count(Q1, Q2, Q3)
+```
+
+*Full data*
+```{r}
+handlers("progress")  # once per session
+ #  Create folder for intermediate outputs
+ dir.create("_openai_classification_cache", showWarnings = FALSE)
+ checkpoint_q12 <- "_openai_classification_cache/df_fb_filtered_q12_checkpoint.rds"
+ checkpoint_q3  <- "_openai_classification_cache/df_fb_filtered_q123_checkpoint.rds"
+ 
+# ---------------------------
+# PASS 1: Q1 + Q2 for all posts
+# ---------------------------
+if (file.exists(checkpoint_q12)) {
+  
+  df_fb_filtered <- readr::read_rds(checkpoint_q12)
+  
+} else {
+  
+  df_fb_filtered <- df_fb_filtered %>%
+    mutate(
+      row_index = row_number(),
+      Q1 = NA_integer_,
+      Q2 = NA_integer_,
+      GPT_Q12_success = FALSE
+    )
+}
+
+batch_size <- 100
+idx_need_q12 <- which((is.na(df_fb_filtered$Q1) | is.na(df_fb_filtered$Q2)) &
+    !is.na(df_fb_filtered$text_combined) &
+    stringr::str_squish(df_fb_filtered$text_combined) != "")
+
+q12_batches <- split(idx_need_q12, ceiling(seq_along(idx_need_q12) / batch_size))
+
+with_progress({
+  
+  p <- progressor(along = idx_need_q12)
+  
+  for (batch in q12_batches) {
+    
+    q12_tbl <- map_dfr(
+      batch,
+      ~{
+        p(message = "PASSO 1/2: Classificando Q1 e Q2...")
+        
+        out <- hey_chatGPT_Q12(
+          post_text = df_fb_filtered$text_combined[.x],
+          model = gpt_model
+        )
+        
+        tibble(row_index = .x) %>%
+          bind_cols(out)
+      }
+    )
+    
+    df_fb_filtered$Q1[q12_tbl$row_index] <- q12_tbl$Q1
+    df_fb_filtered$Q2[q12_tbl$row_index] <- q12_tbl$Q2
+    df_fb_filtered$GPT_Q12_success[q12_tbl$row_index] <- q12_tbl$GPT_Q12_success
+    
+    readr::write_rds(df_fb_filtered, checkpoint_q12)
+  }
+})
+
+# Conservative treatment of failures:
+# Keep the success indicator for auditing, but code failed cases as 0 for downstream filtering.
+df_fb_filtered <- df_fb_filtered %>%
+  mutate(
+    Q1 = as.integer(replace_na(Q1, 0L)),
+    Q2 = as.integer(replace_na(Q2, 0L)),
+    Q2 = if_else(Q1 == 0L, 0L, Q2)
+  )
+
+# readr::write_rds(df_fb_filtered, checkpoint_q12)
+
+
+# ---------------------------
+# PASS 2: Q3 only if Q1==1 & Q2==1
+# ---------------------------
+
+if (file.exists(checkpoint_q3)) {
+  
+  df_fb_filtered <- readr::read_rds(checkpoint_q3)
+  
+} else {
+  
+  if (!"Q3" %in% names(df_fb_filtered)) {
+    df_fb_filtered$Q3 <- 0L
+  }
+  
+  if (!"GPT_Q3_success" %in% names(df_fb_filtered)) {
+    df_fb_filtered$GPT_Q3_success <- NA
+  }
+}
+
+idx_need_q3 <- which(
+  df_fb_filtered$Q1 == 1L &
+    df_fb_filtered$Q2 == 1L &
+    (is.na(df_fb_filtered$Q3) | is.na(df_fb_filtered$GPT_Q3_success))
+)
+
+q3_batches <- split(idx_need_q3, ceiling(seq_along(idx_need_q3) / batch_size))
+
+with_progress({
+  
+  p <- progressor(along = idx_need_q3)
+  
+  if (length(idx_need_q3) > 0) {
+    
+    for (batch in q3_batches) {
+      
+      q3_tbl <- map_dfr(
+        batch,
+        ~{
+          p(message = "PASSO 2/2: Classificando Q3...")
+          
+          out <- hey_chatGPT_Q3(
+            post_text = df_fb_filtered$text_combined[.x],
+            model = gpt_model
+          )
+          
+          tibble(row_index = .x) %>%
+            bind_cols(out)
+        }
+      )
+      
+      df_fb_filtered$Q3[q3_tbl$row_index] <- as.integer(replace_na(q3_tbl$Q3, 0L))
+      df_fb_filtered$GPT_Q3_success[q3_tbl$row_index] <- q3_tbl$GPT_Q3_success
+      
+      readr::write_rds(df_fb_filtered, checkpoint_q3)
+    }
+  }
+})
+
+# Everyone who is not Q1=1 & Q2=1 should have Q3=0
+df_fb_filtered <- df_fb_filtered %>%
+  mutate(
+    Q3 = if_else(Q1 == 1L & Q2 == 1L, as.integer(replace_na(Q3, 0L)), 0L)
+  )
+
+# readr::write_rds(df_fb_filtered, checkpoint_q3)
+```
+
+```{r}
+df_fb_filtered %>% count(Q1)
+df_fb_filtered %>% count(Q2)
+df_fb_filtered %>% count(Q1, Q2, Q3)
+
+# Should be zero
+df_fb_filtered %>%
+  filter(Q2 == 1L, Q1 != 1L) %>%
+  nrow()
+
+# API failures
+df_fb_filtered %>%
+  summarise(
+    n_posts = n(),
+    q12_failures = sum(!GPT_Q12_success, na.rm = TRUE),
+    q3_needed = sum(Q1 == 1L & Q2 == 1L),
+    q3_failures = sum(Q1 == 1L & Q2 == 1L & !GPT_Q3_success, na.rm = TRUE)
+  )
+```
+
+# Descriptive Analysis
+## Election Posts Subset
+```{r}
+df_filtered_breakdown <- df_fb_filtered %>%
+  summarise(
+    PEC135 = {
+      x <- unique(PEC135[!is.na(PEC135)])
+      if (length(x) == 0) NA_real_ else x[1]
+    },
+
+    Q1_posts = sum(Q1 == 1, na.rm = TRUE),
+    Q2_posts = sum(Q2 == 1, na.rm = TRUE),
+    Q3_posts = sum(Q3 == 1, na.rm = TRUE),
+
+    native_video_posts = sum(type == "Native Video", na.rm = TRUE),
+    photo_posts = sum(type == "Photo", na.rm = TRUE),
+    live_video_complete_posts = sum(type == "Live Video Complete", na.rm = TRUE),
+    link_posts = sum(type == "Link", na.rm = TRUE),
+    youtube_posts = sum(type == "YouTube", na.rm = TRUE),
+
+    party = {
+      x <- unique(party[!is.na(party)])
+      if (length(x) == 0) NA_character_ else x[1]
+    },
+
+    party_ideology = {
+      x <- unique(ideology_2021[!is.na(ideology_2021)])
+      if (length(x) == 0) NA_real_ else x[1]
+    },
+
+    domain = {
+      x <- sort(unique(domain[!is.na(domain)]))
+      if (length(x) == 0) NA_character_ else paste(x, collapse = ";")
+    },
+
+    .by = author
+  )
+```
+
+## Overall Data
+```{r}
+fb_breakdown <- df_fb %>%
+  arrange(author, timestamp) %>%
+  summarise(
+    PEC135 = {
+      x <- unique(PEC135[!is.na(PEC135)])
+      if (length(x) == 0) NA_real_ else x[1]
+    },
+
+    native_video_posts = sum(type == "Native Video", na.rm = TRUE),
+    photo_posts = sum(type == "Photo", na.rm = TRUE),
+    live_video_complete_posts = sum(type == "Live Video Complete", na.rm = TRUE),
+    link_posts = sum(type == "Link", na.rm = TRUE),
+    youtube_posts = sum(type == "YouTube", na.rm = TRUE),
+
+    state = {
+      x <- unique(state[!is.na(state)])
+      if (length(x) == 0) NA_character_ else x[1]
+    },
+
+    party = {
+      x <- unique(party[!is.na(party)])
+      if (length(x) == 0) NA_character_ else x[1]
+    },
+
+    party_ideology = {
+      x <- unique(ideology_2021[!is.na(ideology_2021)])
+      if (length(x) == 0) NA_real_ else x[1]
+    },
+
+    hashtags = {
+      x <- unique(trimws(unlist(strsplit(hashtags[!is.na(hashtags)], ","))))
+      x <- sort(x[x != ""])
+      if (length(x) == 0) NA_character_ else paste(x, collapse = ";")
+    },
+
+    domain = {
+      x <- sort(unique(domain[!is.na(domain)]))
+      if (length(x) == 0) NA_character_ else paste(x, collapse = ";")
+    },
+
+    total_posts = n(),
+
+    avg_engagement = mean(engagement, na.rm = TRUE),
+    sd_engagement = sd(engagement, na.rm = TRUE),
+
+    followers_start = {
+      x <- page_followers[!is.na(page_followers)]
+      if (length(x) == 0) NA_real_ else x[1]
+    },
+
+    followers_end = {
+      x <- page_followers[!is.na(page_followers)]
+      if (length(x) == 0) NA_real_ else x[length(x)]
+    },
+
+    followers_change = followers_end - followers_start,
+
+    mean_followership = {
+      x <- page_followers[!is.na(page_followers)]
+      if (length(x) == 0) NA_real_ else round(mean(x), 0)
+    },
+
+    parochial_matches_total = sum(parochial_matches, na.rm = TRUE),
+    parochial_matches_average = round(mean(parochial_matches, na.rm = TRUE), 3),
+
+    programmatic_matches_total = sum(programmatic_matches, na.rm = TRUE),
+    programmatic_matches_average = round(mean(programmatic_matches, na.rm = TRUE), 3),
+
+    propagandistic_matches_total = sum(propagandistic_matches, na.rm = TRUE),
+    propagandistic_matches_average = round(mean(propagandistic_matches, na.rm = TRUE), 3),
+
+    parochial_posts = sum(dominant_style == "Parochial", na.rm = TRUE),
+    programmatic_posts = sum(dominant_style == "Programmatic", na.rm = TRUE),
+    propagandistic_posts = sum(dominant_style == "Propagandistic", na.rm = TRUE),
+    tie_posts = sum(dominant_style == "Tie", na.rm = TRUE),
+    no_match_posts = sum(dominant_style == "No match", na.rm = TRUE),
+
+    .by = author
+  ) %>%
+  left_join(
+    df_filtered_breakdown %>%
+      select(author, Q1_posts, Q2_posts, Q3_posts),
+    by = "author"
+  ) %>%
+  mutate(
+    Q1_posts = coalesce(Q1_posts, 0L),
+    Q2_posts = coalesce(Q2_posts, 0L),
+    Q3_posts = coalesce(Q3_posts, 0L),
+
+    group = if_else(
+      PEC135 == 1 & Q2_posts >= 1,
+      "Wolves",
+      "Other politicians",
+      missing = "Other politicians"
+    ),
+    group = factor(group, levels = c("Other politicians", "Wolves"))
+  ) %>%
+  select(author,group,PEC135,Q1_posts,Q2_posts,Q3_posts,native_video_posts,photo_posts,live_video_complete_posts,
+         link_posts,youtube_posts,state,party,party_ideology,hashtags,domain,total_posts,avg_engagement,sd_engagement,
+         followers_start,followers_end,followers_change,mean_followership,
+         parochial_matches_total,parochial_matches_average,programmatic_matches_total,programmatic_matches_average,
+         propagandistic_matches_total,propagandistic_matches_average,parochial_posts,programmatic_posts,
+         propagandistic_posts
+  )
+```
+
+```{r}
+fb_breakdown %>%
+  summarise(
+    `PEC135 + Q1` = sum(PEC135 == 1 & Q1_posts >= 1, na.rm = TRUE),
+    `PEC135 + Q1 + Q2` = sum(PEC135 == 1 & Q1_posts >= 5 & Q2_posts >= 5, na.rm = TRUE),
+    `PEC135 + Q1 + Q2 + Q3` = sum(PEC135 == 1 & Q1_posts >= 5 & Q2_posts >= 5 & Q3_posts >= 1, na.rm = TRUE)
+  ) %>%
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "condition",
+    values_to = "n_authors"
+  )
+```
+#### Export
+```{r}
+# Export df_fb after GPT analysis
+readr::write_csv2(
+  df_fb,
+  here::here("_processed_data", "df_fb_GPT.csv")
+)
+readr::write_rds(
+  df_fb,
+  here::here("_processed_data", "df_fb_GPT.rds")
+)
+
+# Export GPT_processed_data 
+readr::write_csv2(
+  df_fb_filtered,
+  here::here("_processed_data", "election_dataset.csv")
+)
+readr::write_rds(
+  df_fb_filtered,
+  here::here("_processed_data", "election_dataset.rds")
+)
+```
+
+# TO BE REVISED
+### Communication Style
+```{r}
+p_style <- fb_breakdown %>%
+  group_by(group) %>%
+  summarise(
+    parochial_mean = mean(parochial_matches_average, na.rm = TRUE),
+    parochial_sd = sd(parochial_matches_average, na.rm = TRUE),
+
+    programmatic_mean = mean(programmatic_matches_average, na.rm = TRUE),
+    programmatic_sd = sd(programmatic_matches_average, na.rm = TRUE),
+
+    propagandistic_mean = mean(propagandistic_matches_average, na.rm = TRUE),
+    propagandistic_sd = sd(propagandistic_matches_average, na.rm = TRUE),
+
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = -group,
+    names_to = c("style", ".value"),
+    names_pattern = "(.*)_(mean|sd)"
+  ) %>%
+  mutate(
+    style = recode(
+      style,
+      "parochial" = "Parochial",
+      "programmatic" = "Programmatic",
+      "propagandistic" = "Propagandistic"
+    ),
+    style = factor(style, levels = c("Parochial", "Programmatic", "Propagandistic"))
+  ) %>%
+  ggplot(aes(x = style, y = mean, fill = group)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(
+    aes(ymin = pmax(mean - sd, 0), ymax = mean + sd),
+    position = position_dodge(width = 0.8),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = c(
+    "Wolves" = "coral",
+    "Other politicians" = "darkgrey"
+  )) +
+  labs(
+    title = "Average Content-Style Matches by Group",
+    x = "",
+    y = "Average number of matches per post",
+    fill = ""
+  ) +
+  theme_minimal(base_family = "EB Garamond") +
+  theme(
+    text = element_text(family = "EB Garamond"),
+    plot.title = element_text(size = 34, face = "bold", hjust = 0),
+    axis.title = element_text(size = 26),
+    axis.text.x = element_text(size = 24),
+    axis.text.y = element_text(size = 22),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 22),
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(20, 30, 20, 30)
+  )
+
+p_style
+```
+
+```{r}
+ggsave(
+  filename = "Styles_Avg.png",
+  path = output_path,
+  plot = p_style,
+  device = "png",
+  width = 12,
+  height = 7,
+  dpi = 300
+)
+```
+
+
+```{r}
+p_dominant_style <- df_fb %>%
+  left_join(
+    fb_breakdown %>% select(author, group),
+    by = "author"
+  ) %>%
+  filter(!is.na(group)) %>%
+  mutate(
+    dominant_style = factor(
+      dominant_style,
+      levels = c("Parochial", "Programmatic", "Propagandistic", "Tie", "No match")
+    )
+  ) %>%
+  count(author, group, dominant_style, name = "n_posts") %>%
+  group_by(author, group) %>%
+  mutate(prop_posts = 100 * n_posts / sum(n_posts)) %>%
+  ungroup() %>%
+  filter(dominant_style %in% c("Parochial", "Programmatic", "Propagandistic")) %>%
+  group_by(group, dominant_style) %>%
+  summarise(
+    mean = mean(prop_posts, na.rm = TRUE),
+    sd = sd(prop_posts, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = dominant_style, y = mean, fill = group)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(
+    aes(ymin = pmax(mean - sd, 0), ymax = mean + sd),
+    position = position_dodge(width = 0.8),
+    width = 0.2,
+    linewidth = 0.8
+  ) +
+  scale_fill_manual(values = c(
+    "Wolves" = "coral",
+    "Other politicians" = "darkgrey"
+  )) +
+  scale_y_continuous(
+    labels = scales::label_number(accuracy = 0.1, suffix = "%")
+  ) +
+  labs(
+    title = "Dominant Content Style by Group",
+    x = "",
+    y = "Mean percentage of posts per account",
+    fill = ""
+  ) +
+  theme_minimal(base_family = "EB Garamond") +
+  theme(
+    text = element_text(family = "EB Garamond"),
+    plot.title = element_text(size = 34, face = "bold", hjust = 0),
+    axis.title = element_text(size = 26),
+    axis.text.x = element_text(size = 24),
+    axis.text.y = element_text(size = 22),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 22),
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(20, 30, 20, 30)
+  )
+
+p_dominant_style
+```
+
+```{r}
+ggsave(
+  filename = "Dominant_Style.png",
+  path = output_path,
+  plot = p_dominant_style,
+  device = "png",
+  width = 12,
+  height = 7,
+  dpi = 300
+)
+```
+
+```{r}
+df_fb %>%
+  left_join(fb_breakdown %>% select(author, group), by = "author") %>%
+  mutate(
+    dominant_style = case_when(
+      parochial_matches == 0 & programmatic_matches == 0 & propagandistic_matches == 0 ~ "No match",
+      parochial_matches > programmatic_matches & parochial_matches > propagandistic_matches ~ "Parochial",
+      programmatic_matches > parochial_matches & programmatic_matches > propagandistic_matches ~ "Programmatic",
+      propagandistic_matches > parochial_matches & propagandistic_matches > programmatic_matches ~ "Propagandistic",
+      TRUE ~ "Tie"
+    )
+  ) %>%
+  count(group, dominant_style) %>%
+  group_by(group) %>%
+  mutate(percent = round(100 * n / sum(n), 2))
+```
+
+
+# Discursive analysis
+
+```{r}
+words_to_embed <- c(
+"voto", "votos", "impresso", "urna", "urnas", "eletronica", "auditavel", "pec", "pec135", "sistema", "cedula", "cedulas", "pec 135", "13519", "1352019", "eletronicas", "urnaeletronica", "auditaveis", "votoimpresso", "codigo fonte"
+)
+
+stopwords <- c(
+"13519", "2018", "2020", "2022", "a", "agora", "ao", "aos", "as", "ano", "aqui", "ate", "cada", "como", "com", "da", "das", "de", "desde", "dia", "do", "dos", "durante", "ele", "eles", "em", "e", "eu", "entre", "era", "essa", "esse", "estao", "estaram", "estarei", "esta", "fez", "ficam", "foi", "foram", "fazer", "ha", "havia", "hoje", "ir","isso", "ja", "mais", "mas", "meio", "meu", "mesmo", "mil", "minha", "na", "nas", "nao", "nas", "nem", "no", "nos", "nossa", "nosso", "novo", "o", "ontem", "os", "ou", "para", "pela", "pelo", "pelos", "por", "pra", "proximo", "pode", "qual", "quando", "quem", "quer", "que", "retorno", "riograndedosul", "sabe", "sao", "se", "seja", "sem", "sera", "ser", "seria", "seu", "seus", "sim", "sido", "so", "sobre", "sou", "suas", "sua", "tambem", "teu", "tenha", "tem", "tenho", "ter", "tera", "todos", "todas", "todo", "trata", "um", "uma", "uso", "vai", "vamos", "vao", "vem", "via", "voce", "volta", "ela", "num", "feira", "hora", "deu", "apos", "esses", "atual"
+)
+```
+
+The next section calculates the pointwise mutual information value of terms included in the 'body' of our social media posts. This value is defined as the logarithm of the probability of finding two words together, normalized for the probability of finding each of the words alone. To do so, I also calculated the probability that a word (W2) appears in association with the key words in 'words_to_embed' (W1), divided by the total number of word pairings across the whole corpus (and log-transformed). Based on this analysis, we are able to map out the semantic space of these social media posts.
+
+### Against PEC135
+
+```{r}
+voting_skipgrams <- fb_against_subset %>%
+  unnest_tokens(ngram, body, token = "ngrams", n = 6) %>%
+    dplyr::mutate(ngramID = row_number()) %>% 
+    tidyr::unite(skipgramID, postID, ngramID) %>%
+    unnest_tokens(word, ngram)
+
+voting_probs <- voting_skipgrams %>%
+    pairwise_count(word, skipgramID, diag = TRUE, sort = TRUE) %>% 
+    mutate(p = n / sum(n))
+
+voting_unigram_probs <- fb_against_subset %>%
+  unnest_tokens(word, body) %>%
+  dplyr::count(word, sort = TRUE) %>%
+  mutate(p = n / sum(n))
+
+#normalize skipgram probabilities
+voting_normalized_prob <- voting_probs %>%
+    filter(n > 20) %>% #filter out skipgrams with n <=20
+    dplyr::rename(word1 = item1, word2 = item2) %>%
+    left_join(voting_unigram_probs %>%
+                  select(word1 = word, p1 = p),
+              by = "word1") %>%
+    left_join(voting_unigram_probs %>%
+                  select(word2 = word, p2 = p),
+              by = "word2") %>%
+    mutate(p_together = p / p1 / p2)
+```
+
+```{r}
+against_p_together <- voting_normalized_prob %>%
+    filter(word1 %in% words_to_embed) %>%
+    arrange(word1, -p_together) %>%
+    filter(p_together >= 0.6) %>% 
+    filter(!word1 %in% stopwords & !word2 %in% stopwords)
+# [p_together <1]
+```
+
+**Extract new words from word2 that are not in the original list**
+
+```{r}
+new_words <- setdiff(unique(against_p_together$word2), words_to_embed)
+
+#Second pass — compute co-occurrences for the new words
+against_p_together2 <- voting_normalized_prob %>%
+  filter(word1 %in% new_words) %>%
+  arrange(word1, -p_together) %>%
+  filter(p_together >= 0.6) %>%
+  filter(!word1 %in% stopwords & !word2 %in% stopwords)
+
+#Combine both passes
+against_p_together <- bind_rows(against_p_together, against_p_together2) %>%
+  select(-p, -p1, -p2) %>%
+  rename(Source = word1, Target = word2)
+
+#remove rows with the same terms
+against_p_together <- against_p_together %>%
+  filter(Source != Target)
+```
+
+#### Term occurrences
+
+```{r}
+#Create a dataframe with unique terms from Source and Target columns
+against_unique_terms <- data.frame(
+  term = unique(c(against_p_together$Source, against_p_together$Target)),
+  stringsAsFactors = FALSE
+)
+                     
+# Create a regular expression pattern to match any of the unique ids
+against_pattern <- paste(against_unique_terms$term, collapse = "|")
+
+# Extract all occurrences of unique ids from "body" column
+against_nodes <- lapply(fb_against_subset[c("body")], function(x) {
+  str_extract_all(x, against_pattern, simplify = FALSE)
+})
+
+against_nodes_list <- against_nodes %>%
+  unlist() %>%
+  as.data.frame()
+
+  colnames(against_nodes_list) <- "Id"
+  
+  against_nodes_list <- against_nodes_list %>%
+  filter(!is.na(Id))
+
+against_nodes_mentioned <- against_nodes_list %>%
+  group_by(Id) %>%
+  count()
+
+# write.csv(against_nodes_mentioned, "against_nodes_mentioned.csv", row.names = FALSE)
+```
+
+```{r}
+# Split the against_pattern string into individual words
+against_words <- str_split(against_pattern, "\\|")[[1]]
+
+# Create the against_authors_count dataset
+against_unique_authors <- unique(fb_against_subset$author)
+against_authors_count <- data.frame(author = against_unique_authors)
+
+# Function to count occurrences of words in a text
+count_occurrences <- function(text, words) {
+  word_counts <- sapply(words, function(word) sum(str_count(text, fixed(word))))
+  return(word_counts)
+}
+
+# Iterate over each author and each row to count occurrences
+for (i in 1:nrow(against_authors_count)) {
+  author <- against_authors_count$author[i]
+  author_rows <- fb_against_subset %>% filter(author == !!author)
+  
+  word_counts <- count_occurrences(
+    paste(author_rows$body, author_rows$body_image, author_rows$body_link, author_rows$body_description, collapse = " "),
+    against_words
+  )
+  
+  against_authors_count[i, names(word_counts)] <- word_counts
+}
+
+against_authors_count[is.na(against_authors_count)] <- 0
+
+print(against_authors_count)
+```
+
+##### Gephi
+
+```{r}
+# Melt the against_authors_count dataframe
+gephi_against_authors_count <- pivot_longer(against_authors_count, -author, names_to = "Target", values_to = "n")
+
+# Rename the 'author' column to 'Source'
+gephi_against_authors_count <- rename(gephi_against_authors_count, Source = author)
+
+# Expand the rows based on the 'n' count
+gephi_against_authors_count <- gephi_against_authors_count %>%
+  uncount(n) %>%
+  select(Source, Target)
+
+# Export the dataset to a CSV file
+# write.csv(gephi_against_authors_count, "gephi_against_authors_count.csv", row.names = FALSE)
+```
+
+```{r}
+unique_against_names <- unique(c(gephi_against_authors_count$Source, gephi_against_authors_count$Target))
+
+# Create the new dataset gephi_against_nodes
+gephi_against_nodes <- data.frame(Name = unique_against_names)
+
+# Add Node_Type column with default value 0
+gephi_against_nodes$Node_Type <- 0
+
+# Set Node_Type to 1 for matches with fb_against_individual_breakdown$author
+gephi_against_nodes$Node_Type[gephi_against_nodes$Name %in% fb_against_individual_breakdown$author] <- 1
+
+gephi_against_nodes$total_posts <- NA
+
+# Create a named vector for total_posts from fb_against_individual_breakdown
+total_posts_vector <- setNames(fb_against_individual_breakdown$total_posts, fb_against_individual_breakdown$author)
+
+# Assign total_posts values based on matching names
+gephi_against_nodes$total_posts <- total_posts_vector[gephi_against_nodes$Name]
+
+# Replace NA with 0 for those without a match (if desired)
+gephi_against_nodes$total_posts[is.na(gephi_against_nodes$total_posts)] <- 0
+
+# Create a named vector for term frequencies from against_nodes_mentioned
+against_term_frequency_vector <- setNames(against_nodes_mentioned$n, against_nodes_mentioned$Id)
+
+# Create the Term_Frequency column separately to avoid referencing it before creation
+gephi_against_nodes <- gephi_against_nodes %>%
+  mutate(Term_Frequency = if_else(
+    Node_Type == 0,
+    against_term_frequency_vector[Name],
+    NA_real_
+  ))
+
+# Replace NAs with 0
+gephi_against_nodes <- gephi_against_nodes %>%
+  mutate(Term_Frequency = replace_na(Term_Frequency, 0))
+
+# Gephi Labeling 
+gephi_against_nodes <- gephi_against_nodes %>%
+  mutate(Labels = Name)
+
+ # write.csv(gephi_against_nodes, file = "gephi_against_nodes.csv", row.names = FALSE)
+```
+
+## Pro PEC
+
+```{r}
+pro_voting_skipgrams <- fb_pro_subset %>%
+  unnest_tokens(ngram, body, token = "ngrams", n = 6) %>%
+    dplyr::mutate(ngramID = row_number()) %>% 
+    tidyr::unite(skipgramID, postID, ngramID) %>%
+    unnest_tokens(word, ngram)
+
+pro_voting_probs <- pro_voting_skipgrams %>%
+    pairwise_count(word, skipgramID, diag = TRUE, sort = TRUE) %>% 
+    mutate(p = n / sum(n))
+
+pro_voting_unigram_probs <- fb_pro_subset %>%
+  unnest_tokens(word, body) %>%
+  dplyr::count(word, sort = TRUE) %>%
+  mutate(p = n / sum(n))
+
+#normalize skipgram probabilities
+pro_voting_normalized_prob <- pro_voting_probs %>%
+    filter(n > 20) %>% #filter out skipgrams with n <=20
+    dplyr::rename(word1 = item1, word2 = item2) %>%
+    left_join(pro_voting_unigram_probs %>%
+                  select(word1 = word, p1 = p),
+              by = "word1") %>%
+    left_join(pro_voting_unigram_probs %>%
+                  select(word2 = word, p2 = p),
+              by = "word2") %>%
+    mutate(p_together = p / p1 / p2)
+```
+
+```{r}
+pro_p_together <- pro_voting_normalized_prob %>%
+    filter(word1 %in% words_to_embed) %>%
+    arrange(word1, -p_together) %>%
+    filter(p_together >= 0.6) %>% 
+    filter(!word1 %in% stopwords & !word2 %in% stopwords)
+# [p_together <1]
+```
+
+**Extract new words from word2 that are not in the original list**
+
+```{r}
+new_words_pro <- setdiff(unique(pro_p_together$word2), words_to_embed)
+
+# Second pass: word1 in new words
+pro_p_together2 <- pro_voting_normalized_prob %>%
+  filter(word1 %in% new_words_pro) %>%
+  arrange(word1, -p_together) %>%
+  filter(p_together >= 0.6) %>%
+  filter(!word1 %in% stopwords & !word2 %in% stopwords)
+
+# Combine both passes
+pro_p_together <- bind_rows(pro_p_together, pro_p_together2) %>%
+  select(-p, -p1, -p2) %>%
+  rename(Source = word1, Target = word2)
+
+# Remove rows where Source == Target
+pro_p_together <- pro_p_together %>%
+  filter(Source != Target)
+```
+
+#### Terms occurrences
+
+```{r}
+#Create a dataframe with unique terms from Source and Target columns
+pro_unique_terms <- data.frame(
+  term = unique(c(pro_p_together$Source, pro_p_together$Target)),
+  stringsAsFactors = FALSE
+)
+                     
+# Create a regular expression pattern to match any of the unique ids
+pro_pattern <- paste(pro_unique_terms$term, collapse = "|")
+
+# Extract all occurrences of unique ids from "body" column
+pro_nodes <- lapply(fb_against_subset[c("body", "body_image", "body_link", "body_description")], function(x) {
+  str_extract_all(x, pro_pattern, simplify = FALSE)
+})
+
+pro_nodes_list <- pro_nodes %>%
+  unlist() %>%
+  as.data.frame()
+
+  colnames(pro_nodes_list) <- "Id"
+  
+  pro_nodes_list <- pro_nodes_list %>%
+  filter(!is.na(Id))
+
+pro_nodes_mentioned <- pro_nodes_list %>%
+  group_by(Id) %>%
+  count()
+
+# write.csv(pro_nodes_mentioned, "pro_nodes_mentioned.csv", row.names = FALSE)
+```
+
+```{r}
+# Split the pro_pattern string into individual words
+pro_words <- str_split(pro_pattern, "\\|")[[1]]
+
+# Create the pro_authors_count dataset
+unique_authors <- unique(fb_pro_subset$author)
+pro_authors_count <- data.frame(author = unique_authors)
+
+# Function to count occurrences of words in a text
+count_occurrences <- function(text, words) {
+  word_counts <- sapply(words, function(word) sum(str_count(text, fixed(word))))
+  return(word_counts)
+}
+
+# Iterate over each author and each row to count occurrences
+for (i in 1:nrow(pro_authors_count)) {
+  author <- pro_authors_count$author[i]
+  author_rows <- fb_pro_subset %>% filter(author == !!author)
+  
+  word_counts <- count_occurrences(
+    paste(author_rows$body, author_rows$body_image, author_rows$body_link, author_rows$body_description, collapse = " "),
+    pro_words
+  )
+  
+  pro_authors_count[i, names(word_counts)] <- word_counts
+}
+
+pro_authors_count[is.na(pro_authors_count)] <- 0
+
+print(pro_authors_count)
+```
+
+##### Gephi
+
+```{r}
+# Melt the pro_authors_count dataframe
+gephi_pro_authors_count <- pivot_longer(pro_authors_count, -author, names_to = "Target", values_to = "n")
+
+# Rename the 'author' column to 'Source'
+gephi_pro_authors_count <- rename(gephi_pro_authors_count, Source = author)
+
+# Expand the rows based on the 'n' count
+gephi_pro_authors_count <- gephi_pro_authors_count %>%
+  uncount(n) %>%
+  select(Source, Target)
+
+# Export the dataset to a CSV file
+write.csv(gephi_pro_authors_count, "gephi_pro_authors_count.csv", row.names = FALSE)
+```
