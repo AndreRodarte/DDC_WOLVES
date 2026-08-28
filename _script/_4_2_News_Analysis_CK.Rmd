@@ -20,12 +20,15 @@ library(here)
 library(ggalluvial)
 library(igraph)
 library(tibble)
+library(sysfonts)
+library(showtext)
+font_add_google("EB Garamond", "EB Garamond")
+showtext_auto()
 ```
 
 # Data
 
 ```{r}
-
 # Information about politicians
 nodes_breakdown <- read_csv(
   here("_processed_data", "nodes_breakdown.csv"))
@@ -37,7 +40,6 @@ account_by_media_domain_counts <- read_rds(
 # Filtered dataset + GPT analysis
 df_fb_election <- read_rds(
   here("_processed_data", "df_fb_election.rds"))
-
 ```
 
 ## 1. Introduction and Methodological Rationale
@@ -106,8 +108,11 @@ manual_exclusions <- c(
   "lpbraganca", "pedrolupion", "sandersonfederal", "gurgelrj", "marcelvanhattem", 
   "franciscojr", "deputadohugoleal", "evairdemelo", "charliesevangelista", "christinoaureo", 
   "jaquelinecassol", "osiresdamaso", "renataabreuoficial", "domingossavio", "leandre", 
-  "joaoroma", "nereucrispim", "prb10", "agriculturarsgovbr", "portaltanosite", 
-  "blogdomarcosjunior", "gdia", "bitly", "republicanos10", "democratas", "camaralegbr"
+  "joaoroma", "nereucrispim", "adrianaventura", "bilacpinto", "em", "capitaoaugusto",
+  # "agriculturarsgovbr", "portaltanosite", 
+  "blogdomarcosjunior", "gdia", "bitly", 
+  # "republicanos10", "democratas", 
+  "freianastacio"
 )
 
 # 3. Pivot and clean the base data
@@ -172,17 +177,17 @@ plot_1d_baseline <- ggplot(filtered_summary, aes(x = weighted_mean_ideology, y =
     alpha = 0.8, size = 2.5
   ) +
   scale_y_log10(labels = scales::comma) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.4) +
   
   geom_text_repel(
-    data = top_domains,
-    aes(label = domain),
-    size = 3.5,
-    box.padding = 0.8,
-    point.padding = 0.3,
-    max.overlaps = Inf, 
-    seed = 42            
-  ) +
+  data = top_domains,
+  aes(label = domain),
+  family = "EB Garamond",
+  size = 10,
+  box.padding = 0.8,
+  point.padding = 0.3,
+  max.overlaps = Inf, 
+  seed = 42) +
   
   scale_color_viridis_c(
     option = "plasma", 
@@ -193,9 +198,9 @@ plot_1d_baseline <- ggplot(filtered_summary, aes(x = weighted_mean_ideology, y =
     title = "Media Domain Mapping: Ideology, Frequency, and Dispersion",
     subtitle = "Filtered for domains with ≥ 50 shares; top 50 most shared domains labeled.",
     x = "Ideological Center of Gravity (Left < 0 > Right)",
-    y = "Total Shares (Log10 Scale)"
+    y = "Total Shares (Log Scale)"
   ) +
-  theme_minimal() +
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
   theme(
     plot.title = element_text(face = "bold"),
     plot.subtitle = element_text(color = "gray30", margin = margin(b = 10)),
@@ -205,7 +210,7 @@ plot_1d_baseline <- ggplot(filtered_summary, aes(x = weighted_mean_ideology, y =
   )
 
 # Export in high definition
-ggsave("figure1_domain_ideology_baseline.png", plot = plot_1d_baseline, width = 10, height = 7, dpi = 300)
+ggsave("figure1_domain_ideology_baseline.png", plot = plot_1d_baseline, width = 11, height = 8, dpi = 300)
 print(plot_1d_baseline)
 ```
 
@@ -250,16 +255,68 @@ media_diet_enriched <- media_diet_base %>%
   )
 ```
 
+```{r}
+media_diet_enriched %>%
+  summarise(
+    n_domains = n(),
+    zero_wolf = sum(pct_of_wolf_diet == 0),
+    zero_nonwolf = sum(pct_of_nonwolf_diet == 0),
+    zero_either = sum(
+      pct_of_wolf_diet == 0 |
+      pct_of_nonwolf_diet == 0
+    ),
+    positive_both = sum(
+      pct_of_wolf_diet > 0 &
+      pct_of_nonwolf_diet > 0
+    )
+  )
+```
+
 Final Visualization: The Two-Tiered Media Landscape
 We plot the media diet space, rendering the domains as points colored by their underlying ideological score and adjusted for transparency based on exclusivity.
 
 ```{r}
-plot_diet_space <- ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)) +
+positive_attention <- c(
+  media_diet_enriched$pct_of_wolf_diet[
+    media_diet_enriched$pct_of_wolf_diet > 0
+  ],
+  media_diet_enriched$pct_of_nonwolf_diet[
+    media_diet_enriched$pct_of_nonwolf_diet > 0
+  ]
+)
+
+summary(positive_attention)
+
+quantile(
+  positive_attention,
+  probs = c(0, .01, .05, .10, .25, .50, .75, .90, .95, .99, 1)
+)
+
+sigma = 0.0003
+```
+
+
+```{r}
+plot_diet_space <- ggplot(
+  media_diet_enriched,
+  aes(x = pct_of_nonwolf_diet, y = pct_of_wolf_diet)
+) +
   
   # 45-degree identity line (Equal structural attention)
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray60") +
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed",
+    color = "gray60"
+  ) +
   
-  geom_point(aes(color = weighted_mean_ideology, size = total_volume, alpha = 1 - weighted_sd_ideology)) +
+  geom_point(
+    aes(
+      color = weighted_mean_ideology,
+      size = total_volume,
+      alpha = 1 - weighted_sd_ideology
+    )
+  ) +
   
   scale_x_log10(labels = function(x) paste0(x, "%")) +
   scale_y_log10(labels = function(x) paste0(x, "%")) +
@@ -272,16 +329,29 @@ plot_diet_space <- ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = 
     name = "Domain Ideology\nScore"
   ) +
   
-  scale_alpha_continuous(name = "Domain Exclusivity\n(1 - SD)", range = c(0.4, 1)) +
-  scale_size_continuous(name = "Total Combined Shares", labels = scales::comma) +
+  scale_alpha_continuous(
+    name = "Domain Exclusivity\n(1 - SD)",
+    range = c(0.4, 1)
+  ) +
+  
+  scale_size_continuous(
+    name = "Total Combined Shares",
+    labels = scales::comma
+  ) +
   
   geom_text_repel(
-    data = media_diet_enriched %>% filter(diet_ratio > 3.5 | diet_ratio < 0.25 | total_volume > 1500),
+    data = media_diet_enriched %>%
+      filter(
+        diet_ratio > 3.5 |
+        diet_ratio < 0.25 |
+        total_volume > 1500
+      ),
     aes(label = domain),
-    size = 3.5,
+    family = "EB Garamond",
+    size = 10,
     box.padding = 0.4,
     max.overlaps = 25,
-    seed = 42 # Reproducible label placement
+    seed = 42
   ) +
   
   labs(
@@ -290,12 +360,20 @@ plot_diet_space <- ggplot(media_diet_enriched, aes(x = pct_of_nonwolf_diet, y = 
     x = "Share of Non-Wolves Right Media Diet (Log Scale)",
     y = "Share of Wolf Media Diet (Log Scale)"
   ) +
-  theme_minimal() +
+  
+  theme_minimal(
+    base_family = "EB Garamond",
+    base_size = 30
+  ) +
+  
   theme(
     plot.title = element_text(face = "bold"),
     panel.grid.minor = element_blank(),
     legend.position = "right",
-    plot.background = element_rect(fill = "white", color = NA)
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    )
   )
 
 # Export in high definition
