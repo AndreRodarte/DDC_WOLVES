@@ -22,6 +22,7 @@ library(igraph)
 library(tibble)
 library(sysfonts)
 library(showtext)
+library(ggalluvial)
 font_add_google("EB Garamond", "EB Garamond")
 showtext_auto()
 ```
@@ -40,6 +41,9 @@ account_by_media_domain_counts <- read_rds(
 # Filtered dataset + GPT analysis
 df_fb_election <- read_rds(
   here("_processed_data", "df_fb_election.rds"))
+
+q12_domains  <- read_csv(
+  here("_processed_data", "q1_q2_domains.csv"))
 ```
 
 ## 1. Introduction and Methodological Rationale
@@ -294,8 +298,6 @@ quantile(
 
 sigma = 0.0003
 ```
-
-
 ```{r}
 plot_diet_space <- ggplot(
   media_diet_enriched,
@@ -361,10 +363,7 @@ plot_diet_space <- ggplot(
     y = "Share of Wolf Media Diet (Log Scale)"
   ) +
   
-  theme_minimal(
-    base_family = "EB Garamond",
-    base_size = 30
-  ) +
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
   
   theme(
     plot.title = element_text(face = "bold"),
@@ -450,10 +449,15 @@ knitr::kable(
 
 # Generate a summary table of the ecosystem architecture
 typology_summary <- domain_typologies %>%
-  group_by(media_profile) %>%
+  group_by(
+    cat_partisanship,
+    cat_dispersion,
+    cat_salience,
+    media_profile
+  ) %>%
   summarise(
     domain_count = n(),
-    total_shares_in_profile = sum(total_shares),
+    total_shares_in_profile = sum(total_shares, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   arrange(desc(total_shares_in_profile))
@@ -465,9 +469,6 @@ knitr::kable(
   format.args = list(big.mark = ",")
 )
 ```
-
-
-
 ### Structural Asymmetry: The Absence of a Cross-Partisan Right
 
 The cross-tabulation of Partisanship, Dispersion, and Salience yields 11 distinct media profiles out of a mathematically possible 12. The missing 12th category is not a data artifact; it is a critical empirical finding: **There are zero domains in the dataset that qualify as "Right | Cross-Partisan | Core."**
@@ -477,12 +478,8 @@ Structurally, the left and the center both maintain high-volume media spaces tha
 This structural asymmetry proves that the institutional right and the far-right do not possess a shared, cross-cutting media vanguard comparable to the left. Instead, high-volume right-wing media consumption is fundamentally predicated on exclusivity.
 
 ```{r}
-# Load the package at the top of your script
-install.packages("ggalluvial")
-library(ggalluvial)
-
 # ==============================================================================
-# STEP 6: Alluvial Flow of the Media Ecosystem
+# Alluvial Flow of the Media Ecosystem
 # ==============================================================================
 ggplot(typology_summary, aes(axis1 = cat_partisanship, 
                              axis2 = cat_dispersion, 
@@ -507,7 +504,7 @@ ggplot(typology_summary, aes(axis1 = cat_partisanship,
     y = "Total Shares",
     fill = "Partisan Origin"
   ) +
-  theme_minimal() +
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
   theme(
     plot.title = element_text(face = "bold"),
     panel.grid.major.x = element_blank(),
@@ -516,61 +513,7 @@ ggplot(typology_summary, aes(axis1 = cat_partisanship,
 ```
 ```{r}
 # ==============================================================================
-# STEP 7: Factional Diet Composition by Media Typology
-# ==============================================================================
-
-# Merge the typologies into the diet data
-faction_diet_profiles <- media_diet_enriched %>%
-  left_join(domain_typologies %>% select(domain, media_profile), by = "domain") %>%
-  
-  # Calculate what percentage of each faction's TOTAL diet goes to each profile
-  group_by(media_profile) %>%
-  summarise(
-    wolf_diet_allocation = sum(pct_of_wolf_diet, na.rm = TRUE),
-    nonwolf_diet_allocation = sum(pct_of_nonwolf_diet, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  
-  # Pivot long for side-by-side plotting
-  pivot_longer(
-    cols = c(wolf_diet_allocation, nonwolf_diet_allocation),
-    names_to = "faction",
-    values_to = "diet_percentage"
-  ) %>%
-  mutate(
-    faction = if_else(faction == "wolf_diet_allocation", "Wolves", "Non-Wolves Right"),
-    # Filter out tiny niche noise (profiles that make up less than 2% of diets)
-    diet_percentage = if_else(diet_percentage < 2, NA_real_, diet_percentage) 
-  ) %>%
-  drop_na()
-
-# Plot the comparative diet compositions
-ggplot(faction_diet_profiles, aes(x = faction, y = diet_percentage, fill = media_profile)) +
-  geom_col(position = "fill", alpha = 0.9, color = "white") +
-  
-  # Format Y-axis as percentages
-  scale_y_continuous(labels = scales::percent_format()) +
-  
-  # Use a qualitative color palette suitable for distinct categories
-  scale_fill_brewer(palette = "Set3", name = "Media Typology Profile") +
-  
-  labs(
-    title = "Media Diet Composition: Wolves vs. Non-Wolves Right",
-    subtitle = "Proportion of total factional attention allocated to distinct media typologies.",
-    x = "Political Faction",
-    y = "Proportion of Total Media Diet"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.position = "right",
-    panel.grid.major.x = element_blank()
-  )
-```
-
-```{r}
-# ==============================================================================
-# STEP 7 (REVISED): 3-Tier Factional Diet Composition 
+# 3-Tier Factional Diet Composition 
 # (Left/Center vs. Non-Wolves Right vs. Wolves)
 # ==============================================================================
 
@@ -617,7 +560,8 @@ faction_diet_profiles_3tier <- all_shares_clean %>%
   drop_na()
 
 # 5. Plot the 3-column progression
-ggplot(faction_diet_profiles_3tier, aes(x = faction_3tier, y = total_diet_percentage, fill = media_profile)) +
+media_diet_plot <- ggplot(
+  faction_diet_profiles_3tier, aes(x = faction_3tier, y = total_diet_percentage, fill = media_profile)) +
   geom_col(position = "fill", alpha = 0.9, color = "white") +
   
   # Format Y-axis as percentages
@@ -632,18 +576,23 @@ ggplot(faction_diet_profiles_3tier, aes(x = faction_3tier, y = total_diet_percen
     x = "Parliamentary Faction",
     y = "Proportion of Total Media Diet"
   ) +
-  theme_minimal() +
+  theme_minimal(base_family = "EB Garamond", base_size = 40) +
   theme(
     plot.title = element_text(face = "bold"),
     legend.position = "right",
     panel.grid.major.x = element_blank()
   )
-```
 
+ggsave("Media_Diet_Composition.png", 
+       plot = media_diet_plot, width = 7, height = 5, dpi = 300)
+
+media_diet_plot
+```
+*Figure. Media Diet Composition of Wolves and Other Right-Wing Parliamentarians by Media Profile.* Note. Bars show the distribution of domains shared by wolves and non-wolf right-wing parliamentarians across media profiles defined by ideological orientation (weighted mean ideology: left < −0.25; center = −0.25 to 0.25; right > 0.25), dispersion (weighted ideological SD: exclusive < 0.45; cross-partisan ≥ 0.45), and salience (niche < 100 shares; core ≥ 100 shares). Profiles accounting for less than 2% of a group’s media diet are omitted; bars are rescaled to 100% across the remaining profiles.
 
 ```{r}
 # ==============================================================================
-# STEP 8 (REVISED): Connective Faction Test via Partisan-Exclusive Filtering
+# Connective Faction Test via Partisan-Exclusive Filtering
 # ==============================================================================
 
 # 1. Identify the domains that represent the partisan, exclusive network
@@ -714,33 +663,493 @@ cross_tab_partisan <- table(
 
 print("Results of Connective Faction Clustering (Exclusive Partisan Media Only):")
 print(cross_tab_partisan)
+```
+## 5. Domains in Election Propaganda
+Analysis of media domains and profiles in wolves' Q2 posts
+```{r}
+wolf_lookup <- nodes_breakdown %>%
+  dplyr::select(author, is_wolf) %>%
+  dplyr::distinct(author, .keep_all = TRUE)
 
+# -------------------------
+# 2. Domains appearing in wolves' Q2 posts
+# -------------------------
+q2_wolf_domains <- q12_domains %>%
+  dplyr::filter(category == "Q2") %>%
+  dplyr::left_join(wolf_lookup, by = "author") %>%
+  dplyr::filter(is_wolf == 1) %>%
+  dplyr::left_join(
+    domain_typologies %>%
+      dplyr::select(domain, media_profile, cat_partisanship, cat_dispersion,
+        cat_salience), by = "domain") %>%
+  dplyr::mutate(
+    media_profile = dplyr::coalesce(media_profile,"Unclassified"))
 ```
 
+```{r}
+# -------------------------
+# Domain composition of wolves' Q2 posts
+# -------------------------
+q2_wolf_domain_summary <- q2_wolf_domains %>%
+  dplyr::group_by(
+    domain,
+    media_profile,
+    cat_partisanship,
+    cat_dispersion,
+    cat_salience
+  ) %>%
+  dplyr::summarise(
+    domain_appearances = dplyr::n(),
+    n_posts = dplyr::n_distinct(postID),
+    n_authors = dplyr::n_distinct(author),
+    linked = sum(source == "Linked URL"),
+    textual = sum(source == "Text mention"),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    pct_domain_appearances =
+      domain_appearances / sum(domain_appearances) * 100
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(n_posts),
+    dplyr::desc(domain_appearances)
+  )
+
+q2_wolf_domain_summary %>%
+  dplyr::slice_head(n = 30) %>%
+  print(n = 30)
+```
+```{r}
+# -------------------------
+#  Media-profile composition of wolves' Q2 posts
+# -------------------------
+q2_wolf_by_profile <- q2_wolf_domains %>%
+  dplyr::group_by(
+    media_profile,
+    cat_partisanship,
+    cat_dispersion,
+    cat_salience
+  ) %>%
+  dplyr::summarise(
+    domain_appearances = dplyr::n(),
+    n_posts = dplyr::n_distinct(postID),
+    n_authors = dplyr::n_distinct(author),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    pct_domain_appearances =
+      domain_appearances / sum(domain_appearances) * 100
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(pct_domain_appearances)
+  )
+
+q2_wolf_by_profile
+```
+```{r}
+# -------------------------
+# Media-profile composition of wolves' overall media diet
+# -------------------------
+wolf_overall_domains <- domain_long_clean %>%
+  dplyr::left_join(wolf_lookup, by = "author") %>%
+  dplyr::filter(is_wolf == 1) %>%
+  dplyr::left_join(domain_typologies %>%
+      dplyr::select(domain, media_profile, cat_partisanship, cat_dispersion,
+        cat_salience), by = "domain") %>%
+  dplyr::mutate(media_profile = dplyr::coalesce(media_profile,"Unclassified"))
+
+
+wolf_overall_by_profile <- wolf_overall_domains %>%
+  dplyr::group_by(media_profile, cat_partisanship, cat_dispersion, cat_salience)%>%
+  dplyr::summarise(
+    domain_appearances = sum(share_count, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    pct_domain_appearances =
+      domain_appearances / sum(domain_appearances) * 100
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(pct_domain_appearances)
+  )
+
+# -------------------------
+# Compare Q2 media profile vs. wolves' overall media diet
+# -------------------------
+wolf_profile_comparison <- dplyr::bind_rows(
+  q2_wolf_by_profile %>%
+    dplyr::transmute(media_profile, sample = "Q2 posts", domain_appearances, pct_domain_appearances),
+
+  wolf_overall_by_profile %>%
+    dplyr::transmute(media_profile, sample = "Overall posting",
+      domain_appearances, pct_domain_appearances))
+
+wolf_profile_comparison_wide <- wolf_profile_comparison %>%
+  dplyr::select(media_profile, sample, pct_domain_appearances) %>%
+  tidyr::pivot_wider(
+    names_from = sample,
+    values_from = pct_domain_appearances,
+    values_fill = 0) %>%
+  dplyr::mutate(difference = `Q2 posts` - `Overall posting`) %>%
+  dplyr::arrange(dplyr::desc(difference))
+
+wolf_profile_comparison_wide
+```
+#### Plots
+```{r}
+# ==============================================================================
+# MEDIA PROFILE COMPOSITION
+# ==============================================================================
+# Filter out unclassified domains before plotting
+wolf_profile_comparison_filtered <- wolf_profile_comparison %>%
+  filter(!media_profile %in% c("Unclassified", "unclassified", NA)) %>%
+  mutate(
+    sample = recode(sample,
+      "Q2 posts" = "Propaganda against the electoral system",
+      "Overall posting" = "Overall posting"
+    )
+  )
+
+plot_q2_wolf_profiles <- ggplot(
+  wolf_profile_comparison_filtered,
+  aes(
+    x = reorder(media_profile, pct_domain_appearances),
+    y = pct_domain_appearances,
+    fill = sample
+  )
+) +
+  geom_col(position = "dodge", alpha = 0.9) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Overall posting" = "darkgray",
+    "Propaganda against the electoral system" = "coral"
+  )) +
+  scale_y_continuous(labels = function(x) paste0(round(x, 1), "%")) +
+  labs(
+    title = "Media Profiles in Wolves' Propaganda against the Electoral System",
+    subtitle = "Distribution of domain appearances in wolves' propaganda compared with their overall media diet.",
+    x = NULL,
+    y = "Share of Domain Appearances",
+    fill = NULL
+  ) +
+  theme_minimal(base_family = "EB Garamond", base_size = 40) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(margin = margin(b = 5)),
+    plot.margin = margin(t = 5, r = 5, b = 5, l = 5),
+    legend.position = "bottom"
+  )
+
+ggsave("plot_q2_wolf_profiles.png", plot = plot_q2_wolf_profiles, width = 10, height = 5, dpi = 300)
+plot_q2_wolf_profiles
+```
 
 ```{r}
 # ==============================================================================
-# STEP 10 (REVISED): Multi-Modal Classification of Election Denialism
+# TEMPORAL ANALYSIS OF MEDIA DOMAINS IN WOLVES' Q2 POSTS
 # ==============================================================================
+top_media_profiles <- c(
+  "Right | Exclusive | Core",
+  "Left | Cross-Partisan | Core",
+  "Center | Cross-Partisan | Core"
+)
 
-# 1. Prepare the post-level dataset using the composite metric
-post_level_analysis_robust <- df_fb_election %>%
-  # Keep only posts with a linked domain, valid Q2, and valid PEC135 vote
-  filter(!is.na(domain) & domain != "" & !is.na(Q2) & !is.na(PEC135)) %>%
+temporal_q2_wolves <- q2_wolf_domains %>%
   
-  # Join structural typologies
-  inner_join(
-    domain_typologies %>% select(domain, media_profile, cat_partisanship, cat_dispersion), 
-    by = "domain"
+  # Add timestamp from the post-level data
+  dplyr::left_join(
+    q12_posts %>%
+      dplyr::select(postID, author, timestamp) %>%
+      dplyr::distinct(),
+    by = c("postID", "author")
   ) %>%
   
-  # Create a clean week variable for temporal tracking
-  mutate(
-    post_week = floor_date(timestamp, "week"),
-    # The Composite Variable: Text flags skepticism AND Author voted for printed ballot
-    true_denialism = if_else(Q2 == 1 & PEC135 == 1, 1, 0)
+  # Keep the three most recurrent media profiles
+  dplyr::filter(
+    media_profile %in% top_media_profiles
+  ) %>%
+  
+  # Create weekly time unit
+  dplyr::mutate(
+    post_week = lubridate::floor_date(
+      timestamp,
+      unit = "week"
+    ),
+    media_profile = factor(
+      media_profile,
+      levels = top_media_profiles
+    )
+  ) %>%
+  
+  # Count domain appearances by week and profile
+  dplyr::count(
+    post_week,
+    media_profile,
+    name = "domain_appearances"
+  ) %>%
+  
+  # Explicitly represent weeks with zero appearances
+  tidyr::complete(
+    post_week = seq(
+      min(post_week),
+      max(post_week),
+      by = "week"
+    ),
+    media_profile,
+    fill = list(domain_appearances = 0)
   )
 
+temporal_q2_wolves
+```
+
+```{r}
+# ==============================================================================
+# WEEKLY MEDIA-DOMAIN APPEARANCES IN WOLVES' Q2 POSTS
+# ==============================================================================
+plot_q2_wolf_timeline <- ggplot(
+  temporal_q2_wolves,
+  aes(
+    x = post_week,
+    y = domain_appearances,
+    color = media_profile,
+    group = media_profile
+  )
+) +
+  geom_line(linewidth = 1) +
+  geom_point(data = temporal_q2_wolves %>%
+      dplyr::filter(domain_appearances > 0),
+    alpha = 0.4
+  ) +
+  scale_color_manual(
+    values = c(
+      "Right | Exclusive | Core" = "coral",
+      "Center | Cross-Partisan | Core" = "grey",
+      "Left | Cross-Partisan | Core" = "darkgreen"
+    )
+  ) +
+  labs(
+    title = "Media Domains in Wolves' Election-System Propaganda Over Time",
+    subtitle = "Weekly domain appearances in Q2 posts across the three most recurrent media profiles.",
+    x = "Timeline",
+    y = "Number of Domain Appearances",
+    color = "Media Profile"
+  ) +
+  theme_minimal(base_family = "EB Garamond", base_size = 45) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+ggsave("plot_q2_wolf_timeline.png", plot = plot_q2_wolf_timeline, width = 11, height = 8, dpi = 300)
+plot_q2_wolf_timeline
+```
+Inspect posts for mainstream/centrist reporting is being used to support, criticize, reinterpret, or attack the information being shared.
+```{r}
+# ==============================================================================
+# QUALITATIVE INSPECTION OF CENTER | CROSS-PARTISAN | CORE MEDIA IN WOLVES' Q2
+# ==============================================================================
+# Identify unique Q2 posts by wolves containing domains from the
+# Center | Cross-Partisan | Core profile
+q2_center_core_candidates <- q2_wolf_domains %>%
+  dplyr::filter(media_profile == "Center | Cross-Partisan | Core") %>%
+  # Avoid counting the same domain twice if it appears as both
+  # a linked URL and a textual mention
+  dplyr::distinct(postID, author, domain) %>%
+  
+  # Recover post text and timestamp
+  dplyr::left_join(q12_posts %>%
+      dplyr::select(postID, author, timestamp, text_combined) %>%
+      dplyr::distinct(),
+    by = c("postID", "author")) %>%
+  
+  dplyr::filter(!is.na(text_combined), text_combined != "") %>%
+  
+  # Collapse multiple qualifying domains within the same post
+  dplyr::group_by(postID, author, timestamp, text_combined) %>%
+  dplyr::summarise(
+    domains = paste(
+      sort(unique(domain)),
+      collapse = "; "),
+    .groups = "drop"
+  )
+
+
+# -------------------------
+# Random qualitative sample
+# -------------------------
+set.seed(999)
+sample_n_q2 <- min(10, nrow(q2_center_core_candidates))
+
+q2_center_core_sample <- q2_center_core_candidates %>%
+  dplyr::slice_sample(n = sample_n_q2)
+
+cat("Qualitative Sample: Wolves' Q2 Posts Featuring Center | Cross-Partisan | Core Media\n")
+cat("=================================================================================\n\n")
+
+for(i in 1:nrow(q2_center_core_sample)) {
+  
+  cat("POST [", i, "]\n", sep = "")
+  cat("Author:  ", q2_center_core_sample$author[i], "\n")
+  cat("Domain:  ", q2_center_core_sample$domain[i], "\n")
+  cat("Text:\n", q2_center_core_sample$text_combined[i], "\n")
+  cat("---------------------------------------------------------------------------------\n\n")
+}
+```
+
+
+
+
+##6. Domain scores
+
+```{r}
+# ==============================================================================
+# APPENDIX TABLE: MEDIA DOMAINS, IDEOLOGY, AND REFERENCE FREQUENCY
+# ==============================================================================
+media_domain_appendix <- domain_long_clean %>%
+  
+  # Add politicians' ideological scores
+  dplyr::inner_join(
+    nodes_breakdown %>%
+      dplyr::select(
+        author,
+        ideology_2021
+      ),
+    by = "author"
+  ) %>%
+  
+  # Summarize at the domain level
+  dplyr::group_by(domain) %>%
+  dplyr::summarise(
+    
+    # Total number of references to the domain
+    n_references = sum(
+      share_count,
+      na.rm = TRUE
+    ),
+    
+    # Number of distinct politicians referencing the domain
+    n_politicians = dplyr::n_distinct(author),
+    
+    # Ideological center of gravity, weighted by references
+    ideological_score = weighted.mean(
+      ideology_2021,
+      w = share_count,
+      na.rm = TRUE
+    ),
+    
+    .groups = "drop"
+  ) %>%
+  
+  # Retain domains with sufficient frequency and coverage
+  dplyr::filter(
+    n_references >= 10,
+    n_politicians >= 3
+  ) %>%
+  
+  # Format for appendix table
+  dplyr::transmute(
+    domain,
+    ideological_score = round(ideological_score, 3),
+    n_references
+  ) %>%
+  
+  # Most frequently referenced domains first
+  dplyr::arrange(
+    dplyr::desc(n_references)
+  )
+
+
+# Inspect
+media_domain_appendix %>%
+  print(n = 50)
+
+
+# Export CSV
+readr::write_csv(
+  media_domain_appendix,
+  here::here(
+    "_output",
+    "media_domain_ideology_appendix.csv"
+  )
+)
+```
+Ideological scores represent the weighted mean ideological position of politicians referencing each domain, with references used as weights; negative values indicate more left-leaning audiences and positive values indicate more right-leaning audiences. Reference frequency indicates the total number of times a domain was referenced. The table includes only domains referenced at least 10 times and by at least three distinct politicians.
+
+
+
+
+
+# DUMPSTER
+```{r}
+# ==============================================================================
+# Multi-Modal Classification of Election Denialism
+# ==============================================================================
+# 1. Prepare the post-level dataset using the composite metric
+post_level_analysis_robust <- df_fb_election %>%
+  filter(!is.na(domain), domain != "", !is.na(Q2), !is.na(PEC135)) %>%
+  mutate(
+    post_week = floor_date(timestamp, "week"),
+    # True denialism:
+    # Q2 = 1: post contains propaganda against the electoral system
+    # PEC135 = 1: author voted in favor of PEC135
+    true_denialism = as.integer(Q2 == 1 & PEC135 == 1)
+  ) %>%
+
+  # Add domain characteristics AFTER defining true denialism
+  left_join(
+    domain_typologies %>%
+      select(domain, media_profile,
+        cat_partisanship, cat_dispersion, cat_salience),
+    by = "domain")
+
+# VALIDATE CLASSIFICATION
+true_denialism_check <- post_level_analysis_robust %>%
+  count(Q2, PEC135, true_denialism) %>%
+  arrange(desc(true_denialism), Q2, PEC135)
+
+true_denialism_check
+```
+
+```{r}
+df_fb_election %>%
+  filter(Q2 == 1, PEC135 == 1) %>%
+  mutate(
+    domain_status = if_else(
+      !is.na(domain) & domain != "",
+      "Has linked domain",
+      "No linked domain"
+    )
+  ) %>%
+  count(domain_status) %>%
+  mutate(
+    percentage = round(n / sum(n) * 100, 2)
+  )
+```
+
+```{r}
+# Media Typology Composition of True Denialism
+true_denialism_by_profile <- post_level_analysis_robust %>%
+  filter(true_denialism == 1) %>%
+  mutate(
+    media_profile = coalesce(media_profile, "Unclassified")
+  ) %>%
+  count(
+    media_profile,
+    cat_partisanship,
+    cat_dispersion,
+    cat_salience,
+    name = "domain_appearances"
+  ) %>%
+  mutate(
+    share_of_true_denialism =
+      domain_appearances / sum(domain_appearances) * 100
+  ) %>%
+  arrange(desc(domain_appearances))
+
+true_denialism_by_profile
+```
+
+```{r}
 # 2. Descriptive Probability: Media types predicting true denialism
 denialism_by_profile <- post_level_analysis_robust %>%
   group_by(media_profile) %>%
@@ -770,14 +1179,14 @@ ggplot(denialism_by_profile, aes(x = reorder(media_profile, pct_true_denial), y 
     y = "Probability of Post Containing True Denialism",
     fill = "Far-Right Alternative Ecosystem"
   ) +
-  theme_minimal() +
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
   theme(
     plot.title = element_text(face = "bold"),
     legend.position = "none"
   )
 
 # ==============================================================================
-# STEP 11 (REVISED): Temporal Analysis of True Denialism
+# STEP 11: Temporal Analysis of True Denialism
 # ==============================================================================
 
 # Aggregate the volume of true denialist posts over time
@@ -805,7 +1214,7 @@ ggplot(temporal_denialism, aes(x = post_week, y = denialist_volume, color = broa
     y = "Volume of True Denialist Posts",
     color = "Linked Media Ecosystem"
   ) +
-  theme_minimal() +
+  theme_minimal(base_family = "EB Garamond", base_size = 30) +
   theme(
     plot.title = element_text(face = "bold"),
     legend.position = "bottom"
@@ -816,9 +1225,6 @@ ggplot(temporal_denialism, aes(x = post_week, y = denialist_volume, color = broa
 # ==============================================================================
 # APPENDIX FIGURES: Multi-Modal Classification of Election Denialism
 # ==============================================================================
-library(ggplot2)
-library(scales)
-
 # 1. Descriptive Probability Bar Chart
 plot_denialism_bar <- ggplot(denialism_by_profile, aes(x = reorder(media_profile, pct_true_denial), y = pct_true_denial)) +
   geom_col(aes(fill = grepl("Right \\| Exclusive", media_profile)), alpha = 0.9) +
@@ -872,8 +1278,6 @@ ggsave("appendix_fig2_denialism_timeline.png", plot = plot_denialism_timeline, w
 print(plot_denialism_timeline)
 ```
 
-
-
 ```{r}
 # ==============================================================================
 # STEP 13: Qualitative Validation of Refutational Sharing (True Denialists Only)
@@ -902,7 +1306,6 @@ for(i in 1:nrow(true_refutational_sample)) {
   cat("-----------------------------------------------------------------------\n\n")
 }
 ```
-
 ```{r}
 # ==============================================================================
 # STEP 14: Inductive Extraction of Denialist Domains (Bottom-Up)

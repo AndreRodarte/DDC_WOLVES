@@ -1085,7 +1085,6 @@ text_posts_for_spacy <- df_fb %>%
 
 dplyr::glimpse(text_posts_for_spacy)
 ```
-
 ```{r}
 # -------------------------
 # Post-specific hashtag terms
@@ -1180,7 +1179,7 @@ for (b in batch_ids) {
 ```{r}
 #Load parsed batches & Remove stopwords
 parsed_files <- list.files(
-  "_processed_data/spacy_batches",
+  "../_processed_data/spacy_batches",
   pattern = "^parsed_spacy_batch_.*\\.rds$",
   full.names = TRUE
 )
@@ -1546,6 +1545,7 @@ domain_counts_by_source %>%
   dplyr::arrange(source, dplyr::desc(total_mentions)) %>%
   print(n = 100)
 ```
+
 ###Inspection
 ```{r}
 table(domain_counts_by_source$source)
@@ -1565,6 +1565,155 @@ mean(wolves %in% domain_inspection$author) * 100
 sum(domain_inspection$n[domain_inspection$author %in% wolves]) /
   sum(domain_inspection$n) * 100
 ```
+
+##### Q1_2 domains
+```{r}
+q12_posts <- df_fb_election %>%
+  dplyr::filter(Q1 == 1 | Q2 == 1) %>%
+  dplyr::select(
+    postID,
+    author,
+    timestamp,
+    text_combined,
+    domain,
+    Q1,
+    Q2
+  )
+
+dplyr::glimpse(q12_posts)
+
+# -------------------------
+# Store Q1/Q2 classification
+# -------------------------
+# A post classified as both Q1 and Q2 will appear once
+# under each category.
+q12_post_categories <- q12_posts %>%
+  dplyr::select(postID, author, Q1, Q2) %>%
+  tidyr::pivot_longer(
+    cols = c(Q1, Q2),
+    names_to = "category",
+    values_to = "classified"
+  ) %>%
+  dplyr::filter(classified == 1) %>%
+  dplyr::select(
+    postID,
+    author,
+    category
+  )
+
+
+# -------------------------
+# Domains from linked URLs
+# -------------------------
+q12_domain_links <- q12_posts %>%
+  dplyr::select(postID, author, domain) %>%
+  dplyr::filter(!is.na(domain), domain != "") %>%
+  dplyr::mutate(domain = normalize_domain(domain)) %>%
+  dplyr::filter(domain != "") %>%
+  dplyr::mutate(source = "Linked URL")
+
+
+# -------------------------
+# Domains mentioned in text
+# -------------------------
+q12_text_domains <- q12_posts %>%
+  dplyr::filter(!is.na(text_combined), text_combined != "") %>%
+  dplyr::mutate(
+    text_for_vector = text_combined %>%
+      stringr::str_replace_all("\\bhttp\\S+\\b", " ") %>%
+      stringr::str_replace_all("\\bwww\\S+\\b", " ") %>%
+      stringr::str_replace_all("\\bfacebook\\S+\\b", " ") %>%
+      stringr::str_replace_all("\\binstagram\\S+\\b", " ") %>%
+      stringr::str_replace_all("\\btwitter\\S+\\b", " ") %>%
+      stringr::str_replace_all("\\byoutube\\S+\\b", " ") %>%
+      stringr::str_squish(),
+
+    text_for_domain_detection = text_for_vector %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish(),
+
+    matched_aliases = stringr::str_extract_all(
+      text_for_domain_detection,
+      stringr::regex(domain_regex, ignore_case = TRUE))
+    ) %>%
+  dplyr::select(postID,author,matched_aliases) %>%
+  tidyr::unnest_longer(matched_aliases, values_to = "matched_alias") %>%
+  dplyr::filter(!is.na(matched_alias), matched_alias != "") %>%
+  dplyr::mutate(
+    matched_alias = matched_alias %>%
+      stringi::stri_trans_general(id = "Latin-ASCII") %>%
+      stringr::str_to_lower() %>%
+      stringr::str_squish(),
+
+    alias_key = make_domain_key(matched_alias)
+  ) %>%
+  dplyr::left_join(alias_to_domain, by = "alias_key") %>%
+  dplyr::filter(!is.na(domain), domain != "") %>%
+  dplyr::transmute(postID, author, domain, source = "Text mention")
+
+
+# -------------------------
+# Unified domain data
+# -------------------------
+q12_domains <- dplyr::bind_rows(q12_domain_links, q12_text_domains) %>%
+  dplyr::left_join(q12_post_categories, by = c("postID", "author")) %>%
+  dplyr::select(category, postID, author, domain, source)
+
+
+# Inspect
+q12_domains %>%
+  dplyr::count(
+    category,
+    domain,
+    sort = TRUE
+  ) %>%
+  print(n = 100)
+
+# -------------------------
+# Domain-level summary
+# -------------------------
+q12_domain_summary <- q12_domains %>%
+  dplyr::group_by(category, domain) %>%
+  dplyr::summarise(
+    n_mentions = dplyr::n(),
+    n_posts = dplyr::n_distinct(postID),
+    n_authors = dplyr::n_distinct(author),
+    n_linked = sum(source == "Linked URL"),
+    n_text_mentions = sum(source == "Text mention"),
+    .groups = "drop"
+    ) %>%
+  dplyr::arrange(
+    category,
+    dplyr::desc(n_posts),
+    dplyr::desc(n_mentions)
+  )
+
+
+# Export
+readr::write_csv(q12_domains,here::here("_processed_data", "q1_q2_domains.csv"))
+```
+
+```{r}
+q2_domain_summary <- q12_domains %>%
+  dplyr::filter(category == "Q2") %>%
+  dplyr::group_by(domain) %>%
+  dplyr::summarise(
+    n_mentions = dplyr::n(),
+    n_posts = dplyr::n_distinct(postID),
+    n_authors = dplyr::n_distinct(author),
+    linked = sum(source == "Linked URL"),
+    textual = sum(source == "Text mention"),
+    .groups = "drop"
+  ) %>%
+  dplyr::arrange(dplyr::desc(n_posts), dplyr::desc(n_mentions))
+
+q2_domain_summary %>%
+  dplyr::slice_head(n = 30) %>%
+  print(n = 30)
+```
+
+
 ## Metadata
 ```{r}
 # Create account metadata for network analyses
